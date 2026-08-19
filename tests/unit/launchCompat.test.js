@@ -100,11 +100,11 @@ describe('launch compatibility source contract', () => {
 
   test('health probe context also uses a null viewport', () => {
     const healthProbeOptions = sourceBetween(
-      'testContext = await browser.newContext(',
-      'const page = await testContext.newPage();'
+      'const healthProbe = createHealthProbe({',
+      'function getUserNavHealth(userId)'
     );
 
-    expect(healthProbeOptions).toContain('viewport: null');
+    expect(healthProbeOptions).toContain('browser.newContext({ viewport: null })');
   });
 
   test('uses the configured navigation timeout without racing its request deadline', () => {
