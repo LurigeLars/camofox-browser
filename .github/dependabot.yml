@@ -6,7 +6,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-      time: "7:00"
+      time: "07:00"
       timezone: "Europe/Stockholm"
     open-pull-requests-limit: 5
 
@@ -15,7 +15,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-      time: "7:15"
+      time: "07:15"
       timezone: "Europe/Stockholm"
     open-pull-requests-limit: 5
 
@@ -24,6 +24,6 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-      time: "7:30"
+      time: "07:30"
       timezone: "Europe/Stockholm"
     open-pull-requests-limit: 5
