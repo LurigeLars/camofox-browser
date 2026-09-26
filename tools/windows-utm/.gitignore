@@ -1,0 +1,7 @@
+# Generated Windows/UTM artifacts — build these outside the repository when possible.
+*.iso
+*.img
+*.qcow2
+*.utm/
+*.log
+__pycache__/

@@ -28,6 +28,15 @@ describe('timed-out tab operations', () => {
     expect(clickRoute).toContain("destroyTimedOutTab(session, tabId, 'operation_timeout', userId)");
   });
 
+  test('allows tab creation to finish its one-session recovery', () => {
+    const source = readFileSync(new URL('../../server.js', import.meta.url), 'utf8');
+    const createRoute = source.slice(source.indexOf("app.post('/tabs', async (req, res) => {"), source.indexOf('// Navigate', source.indexOf("app.post('/tabs', async (req, res) => {")));
+
+    expect(source).toContain('function tabCreateRequestTimeoutMs()');
+    expect(source).toContain('return Math.max(requestTimeoutMs(), (NEW_PAGE_TIMEOUT_MS * 2) + 5000);');
+    expect(createRoute).toContain("})(), tabCreateRequestTimeoutMs(), 'tab create');");
+  });
+
   test('returns a stable recoverable error after timeout cleanup', () => {
     const error = Object.assign(new Error('action timed out after 5000ms'), { code: 'tab_timeout' });
 
