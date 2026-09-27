@@ -112,6 +112,18 @@ describe('browser error normalization', () => {
     expect(isRetryableBrowserError(err)).toBe(false);
   });
 
+  test('admission rejection and browser unavailability normalize to 503 retry', () => {
+    for (const err of [
+      Object.assign(new Error('Maximum concurrent sessions reached'), { statusCode: 503, code: 'admission_rejected' }),
+      Object.assign(new Error('new page retry timed out after 10000ms'), { statusCode: 503, code: 'browser_unavailable' }),
+    ]) {
+      expect(browserErrorStatus(err)).toBe(503);
+      expect(browserErrorCode(err)).toBe(err.code);
+      expect(browserErrorRecovery(err)).toBe('retry');
+      expect(isRetryableBrowserError(err)).toBe(true);
+    }
+  });
+
   test('launch and user concurrency timeouts normalize to 503 retry', () => {
     const launch = new Error('Browser launch timeout (60s)');
     const concurrency = new Error('User concurrency limit reached, try again');
