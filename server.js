@@ -6,7 +6,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import { expandMacro } from './lib/macros.js';
-import { getSearchFallbacks } from './lib/search-fallbacks.js';
+import { getSearchFallbacks, isExpectedSearchFallbackUrl } from './lib/search-fallbacks.js';
 import { hasGoogleOrganicResults } from './lib/google-serp.js';
 import { loadConfig } from './lib/config.js';
 import { contextIdentityOptions, launchLocale } from './lib/browser-identity.js';
@@ -1998,10 +1998,10 @@ async function isFallbackSearchBlocked(page, engine) {
   const bodyText = await page.evaluate(() => document.body?.innerText?.slice(0, 1000) || '').catch(() => '');
   if (/Unable to connect|502 Bad Gateway or Proxy Error|Camoufox can't establish a connection/i.test(bodyText)) return true;
   if (engine === 'duckduckgo') {
-    return !/duckduckgo\.com/i.test(url) || /captcha|verify you are human|unusual traffic/i.test(bodyText);
+    return !isExpectedSearchFallbackUrl(url, 'duckduckgo') || /captcha|verify you are human|unusual traffic/i.test(bodyText);
   }
   if (engine === 'bing') {
-    return !/bing\.com/i.test(url) || /captcha|verify you are human|unusual traffic/i.test(bodyText);
+    return !isExpectedSearchFallbackUrl(url, 'bing') || /captcha|verify you are human|unusual traffic/i.test(bodyText);
   }
   return true;
 }
