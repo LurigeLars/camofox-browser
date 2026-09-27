@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { getSearchFallbacks } from '../../lib/search-fallbacks.js';
+import { getSearchFallbacks, isExpectedSearchFallbackUrl } from '../../lib/search-fallbacks.js';
 
 const serverSource = fs.readFileSync(path.join(process.cwd(), 'server.js'), 'utf8');
 
@@ -21,6 +21,17 @@ describe('search fallbacks', () => {
   test('does not alter explicit URLs or non-Google macros', () => {
     expect(getSearchFallbacks(null, 'weather today')).toEqual([]);
     expect(getSearchFallbacks('@youtube_search', 'weather today')).toEqual([]);
+  });
+
+  test('accepts only exact or real subdomains for fallback engines', () => {
+    expect(isExpectedSearchFallbackUrl('https://duckduckgo.com/?q=x', 'duckduckgo')).toBe(true);
+    expect(isExpectedSearchFallbackUrl('https://html.duckduckgo.com/html/?q=x', 'duckduckgo')).toBe(true);
+    expect(isExpectedSearchFallbackUrl('https://www.bing.com/search?q=x', 'bing')).toBe(true);
+
+    expect(isExpectedSearchFallbackUrl('https://duckduckgo.com.evil.example/?q=x', 'duckduckgo')).toBe(false);
+    expect(isExpectedSearchFallbackUrl('https://evil-duckduckgo.com/?q=x', 'duckduckgo')).toBe(false);
+    expect(isExpectedSearchFallbackUrl('https://bing.com.evil.example/search?q=x', 'bing')).toBe(false);
+    expect(isExpectedSearchFallbackUrl('not-a-url', 'bing')).toBe(false);
   });
 
   test('encodes the fallback query', () => {
