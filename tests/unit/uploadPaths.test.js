@@ -30,6 +30,8 @@ describe('resolveUploadPaths', () => {
       await fs.symlink(outsideFile, path.join(root, 'escape.txt'));
       await expect(resolveUploadPaths({ uploadsDir: root, filePaths: [outsideFile] }))
         .rejects.toMatchObject({ code: 'upload_path_outside_root' });
+      await expect(resolveUploadPaths({ uploadsDir: root, filePaths: [path.join(outside, 'missing.txt')] }))
+        .rejects.toMatchObject({ code: 'upload_path_outside_root' });
       await expect(resolveUploadPaths({ uploadsDir: root, filePaths: [path.join(root, 'escape.txt')] }))
         .rejects.toMatchObject({ code: 'upload_path_outside_root' });
     } finally {
