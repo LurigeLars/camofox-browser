@@ -1760,14 +1760,20 @@ function findTab(session, tabId) {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function tabNotFoundResponse(res, tabId) {
+  // Express parameters are expected to be strings, but reject/normalize unexpected
+  // runtime types before any string sanitization to avoid parameter type confusion.
+  const safeTabId = typeof tabId === 'string' ? tabId : '';
+
   // Only return 410 for tabs that look like valid UUIDs (plausibly created by this server),
   // belonged to this machine, and were lost in a recent browser restart.
   // Random/invalid strings like 'non-existent-tab' always get 404.
   // Tab IDs may be Fly-prefixed: "{machineId}_{uuid}" — extract UUID portion for validation.
-  const uuidPart = tabId && tabId.includes('_') && !tabId.slice(0, tabId.indexOf('_')).includes('-')
-    ? tabId.slice(tabId.indexOf('_') + 1)
-    : tabId;
-  if (_lastBrowserRestartAt && (Date.now() - _lastBrowserRestartAt < 300_000) && UUID_RE.test(uuidPart) && fly.isLocalTab(tabId)) {
+  const separator = safeTabId.indexOf('_');
+  const prefix = separator === -1 ? '' : safeTabId.slice(0, separator);
+  const uuidPart = separator !== -1 && !prefix.includes('-')
+    ? safeTabId.slice(separator + 1)
+    : safeTabId;
+  if (_lastBrowserRestartAt && (Date.now() - _lastBrowserRestartAt < 300_000) && UUID_RE.test(uuidPart) && fly.isLocalTab(safeTabId)) {
     return res.status(410).json({
       error: 'Tab no longer exists (browser was restarted). Create a new tab.',
       code: 'browser_restarted',

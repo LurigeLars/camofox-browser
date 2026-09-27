@@ -32,6 +32,13 @@ describe('Tab ID machine encoding', () => {
     expect(flyA.parseTabOwner(undefined)).toBe(null);
   });
 
+  test('parseTabOwner rejects non-string tab IDs', () => {
+    expect(flyA.parseTabOwner(['178139e6fe42d8_fake'])).toBe(null);
+    expect(flyA.parseTabOwner({ tabId: '178139e6fe42d8_fake' })).toBe(null);
+    expect(flyA.parseTabOwner(12345)).toBe(null);
+  });
+
+
   test('isLocalTab returns true for local machine tab', () => {
     const tabId = `${MACHINE_A}_a1b2c3d4-e5f6-7890-abcd-ef1234567890`;
     expect(flyA.isLocalTab(tabId)).toBe(true);
