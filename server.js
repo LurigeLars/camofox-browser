@@ -13,7 +13,7 @@ import { contextIdentityOptions, launchLocale } from './lib/browser-identity.js'
 import { normalizePlaywrightProxy, createProxyPool, buildProxyUrl } from './lib/proxy.js';
 import { createFlyHelpers } from './lib/fly.js';
 import { createPluginEvents, loadPlugins, typeEventPayload } from './lib/plugins.js';
-import { requireAuth, accessKeyMiddleware, timingSafeCompare as _timingSafeCompare, isLoopbackAddress as _isLoopbackAddress } from './lib/auth.js';
+import { requireAuth, accessKeyMiddleware, extractBearerToken, timingSafeCompare as _timingSafeCompare, isLoopbackAddress as _isLoopbackAddress } from './lib/auth.js';
 import { windowSnapshot } from './lib/snapshot.js';
 import { extractPageStructure, attachStructureRefs } from './lib/page-structure.js';
 import {
@@ -414,9 +414,8 @@ app.post('/sessions/:userId/cookies', express.json({ limit: '512kb' }), async (r
   try {
     if (CONFIG.apiKey) {
       const apiKey = CONFIG.apiKey;
-      const auth = String(req.headers['authorization'] || '');
-      const match = auth.match(/^Bearer\s+(.+)$/i);
-      if (!match || !timingSafeCompare(match[1], apiKey)) {
+      const token = extractBearerToken(req.headers['authorization']);
+      if (!token || !timingSafeCompare(token, apiKey)) {
         return res.status(403).json({ error: 'Forbidden' });
       }
     } else {
