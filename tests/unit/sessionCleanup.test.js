@@ -339,6 +339,28 @@ describe('YT transcript session cleanup', () => {
   });
 });
 
+describe('admission-safe session teardown', () => {
+  test('detaches before a hanging context close settles', async () => {
+    const sessions = new Map();
+    let resolveClose;
+    const closePromise = new Promise(resolve => { resolveClose = resolve; });
+    const session = { context: { close: () => closePromise }, tabGroups: new Map() };
+    sessions.set('user-1', session);
+
+    async function closeSessionAdmissionSafe(userId, current) {
+      current._closing = true;
+      if (sessions.get(userId) === current) sessions.delete(userId);
+      await current.context.close();
+    }
+
+    const closing = closeSessionAdmissionSafe('user-1', session);
+    expect(session._closing).toBe(true);
+    expect(sessions.size).toBe(0);
+    resolveClose();
+    await closing;
+  });
+});
+
 describe('session expiry _closing flag', () => {
   // Simulate session expiry logic from server.js
   function runSessionExpiry({ sessions, SESSION_TIMEOUT_MS, onExpired }) {

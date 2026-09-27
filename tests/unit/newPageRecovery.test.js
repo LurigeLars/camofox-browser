@@ -58,20 +58,26 @@ describe('createPageWithSessionRecovery', () => {
     expect(destroySession).not.toHaveBeenCalled();
   });
 
-  test('retries only once', async () => {
+  test('retries only once and retires the replacement session when it also fails', async () => {
     const timeoutError = Object.assign(new Error('new page timed out'), { code: 'timeout' });
+    const retryTimeoutError = Object.assign(new Error('new page retry timed out'), { code: 'timeout' });
     const oldSession = { context: { newPage: jest.fn().mockRejectedValue(timeoutError) } };
-    const replacement = { context: { newPage: jest.fn().mockRejectedValue(timeoutError) } };
+    const replacement = { context: { newPage: jest.fn().mockRejectedValue(retryTimeoutError) } };
+    let mappedSession = oldSession;
+    const destroySession = jest.fn(async () => { mappedSession = null; });
+    const getSession = jest.fn(async () => { mappedSession = replacement; return replacement; });
 
     await expect(createPageWithSessionRecovery(recoveryOptions({
       session: oldSession,
-      currentSession: () => oldSession,
-      destroySession: async () => {},
-      getSession: async () => replacement,
-    }))).rejects.toThrow('new page timed out');
+      currentSession: () => mappedSession,
+      destroySession,
+      getSession,
+    }))).rejects.toMatchObject({ code: 'browser_unavailable', statusCode: 503 });
 
     expect(oldSession.context.newPage).toHaveBeenCalledTimes(1);
     expect(replacement.context.newPage).toHaveBeenCalledTimes(1);
+    expect(destroySession).toHaveBeenCalledTimes(2);
+    expect(destroySession).toHaveBeenLastCalledWith('user-1', { reason: 'new_page_retry_unresponsive' });
   });
 
   test('does not recover unrelated failures', async () => {
