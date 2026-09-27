@@ -4,6 +4,7 @@ import {
   clearTabDownloads,
   clearSessionDownloads,
   attachDownloadListener,
+  captureFetchedResource,
   clickWithDownloadGuard,
   downloadEventOccurredSince,
   getDownloadsList,
@@ -163,6 +164,29 @@ describe('lib/downloads', () => {
       await expect(clickWithDownloadGuard({ downloadEventSequence: 0 }, async () => {
         throw error;
       })).rejects.toBe(error);
+    });
+  });
+
+  describe('secure temporary downloads', () => {
+    test('captureFetchedResource stores data in a private temp directory and cleanup removes it', async () => {
+      const tabState = { downloads: [] };
+      const result = await captureFetchedResource(tabState, {
+        url: 'https://example.com/report.pdf',
+        mimeType: 'application/pdf',
+        filename: 'report.pdf',
+        body: Buffer.from('pdf-bytes'),
+      });
+
+      expect(result.suggestedFilename).toBe('report.pdf');
+      expect(tabState.downloads).toHaveLength(1);
+      const record = tabState.downloads[0];
+      expect(path.dirname(record.filePath)).toBe(record.tempDir);
+      expect(path.basename(record.tempDir).startsWith('camofox-download-')).toBe(true);
+      const stat = await fs.stat(record.tempDir);
+      expect(stat.isDirectory()).toBe(true);
+
+      await clearTabDownloads(tabState);
+      await expect(fs.stat(record.tempDir)).rejects.toThrow();
     });
   });
 
