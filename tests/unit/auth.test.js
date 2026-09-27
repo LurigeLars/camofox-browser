@@ -3,9 +3,29 @@
  */
 import { describe, test, expect } from '@jest/globals';
 import { jest } from '@jest/globals';
-import { timingSafeCompare, isLoopbackAddress, requireAuth } from '../../lib/auth.js';
+import { extractBearerToken, timingSafeCompare, isLoopbackAddress, requireAuth } from '../../lib/auth.js';
 
 describe('lib/auth', () => {
+  describe('extractBearerToken', () => {
+    test('parses Bearer tokens with case-insensitive scheme and HTTP whitespace', () => {
+      expect(extractBearerToken('Bearer secret')).toBe('secret');
+      expect(extractBearerToken('bearer\tsecret')).toBe('secret');
+      expect(extractBearerToken('BEARER   secret')).toBe('secret');
+    });
+
+    test('rejects malformed and non-string headers', () => {
+      expect(extractBearerToken('Basic secret')).toBeNull();
+      expect(extractBearerToken('Bearer')).toBeNull();
+      expect(extractBearerToken('Bearer   ')).toBeNull();
+      expect(extractBearerToken(['Bearer secret'])).toBeNull();
+      expect(extractBearerToken(null)).toBeNull();
+    });
+
+    test('handles long whitespace prefixes in linear parsing path', () => {
+      expect(extractBearerToken(`Bearer ${' '.repeat(100_000)}secret`)).toBe('secret');
+    });
+  });
+
   describe('timingSafeCompare', () => {
     test('returns true for matching strings', () => {
       expect(timingSafeCompare('secret', 'secret')).toBe(true);
