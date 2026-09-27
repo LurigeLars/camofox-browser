@@ -6,10 +6,13 @@
 
 // Mirrors the extraction logic in server.js tabNotFoundResponse
 function extractUuidPart(tabId) {
-  if (tabId && tabId.includes('_') && !tabId.slice(0, tabId.indexOf('_')).includes('-')) {
-    return tabId.slice(tabId.indexOf('_') + 1);
+  const safeTabId = typeof tabId === 'string' ? tabId : '';
+  const separator = safeTabId.indexOf('_');
+  const prefix = separator === -1 ? '' : safeTabId.slice(0, separator);
+  if (separator !== -1 && !prefix.includes('-')) {
+    return safeTabId.slice(separator + 1);
   }
-  return tabId;
+  return safeTabId;
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -37,6 +40,14 @@ describe('tabNotFoundResponse UUID extraction', () => {
     expect(UUID_RE.test(extractUuidPart('non-existent-tab'))).toBe(false);
     expect(UUID_RE.test(extractUuidPart('foobar'))).toBe(false);
   });
+
+  test('non-string route parameters normalize to an invalid empty ID', () => {
+    expect(extractUuidPart(['machine_uuid'])).toBe('');
+    expect(extractUuidPart({ tabId: 'machine_uuid' })).toBe('');
+    expect(extractUuidPart(12345)).toBe('');
+    expect(UUID_RE.test(extractUuidPart(['machine_uuid']))).toBe(false);
+  });
+
 
   test('Fly-prefixed with invalid UUID portion fails check', () => {
     const tabId = '68341eecdd3168_not-a-uuid';
