@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from '@jest/globals';
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { platform, tmpdir } from 'os';
 import { prepareExternalCamoufoxExecutable } from '../../lib/camoufox-executable.js';
@@ -43,6 +43,25 @@ describe('prepareExternalCamoufoxExecutable', () => {
       ? join(cacheDir, 'Camoufox.app', 'Contents', 'MacOS', 'camoufox')
       : join(cacheDir, platform() === 'win32' ? 'camoufox.exe' : 'camoufox-bin');
     expect(existsSync(cacheExecutable)).toBe(true);
+  });
+
+  test('preserves an existing cache version while filling missing entries', () => {
+    const bundleDir = makeTempDir();
+    const cacheDir = makeTempDir();
+    const executable = join(bundleDir, 'camoufox-bin');
+
+    writeFileSync(executable, '#!/bin/sh\nexit 0\n');
+    chmodSync(executable, 0o755);
+    writeFileSync(join(bundleDir, 'properties.json'), '[]\n');
+    writeFileSync(join(bundleDir, 'version.json'), '{"version":"135.0.1"}\n');
+    mkdirSync(join(bundleDir, 'fontconfig', 'lin'), { recursive: true });
+    writeFileSync(join(cacheDir, 'version.json'), 'sentinel\n');
+
+    prepareExternalCamoufoxExecutable(executable, { cacheDir });
+
+    expect(existsSync(join(cacheDir, 'properties.json'))).toBe(true);
+    expect(existsSync(join(cacheDir, 'fontconfig'))).toBe(true);
+    expect(readFileSync(join(cacheDir, 'version.json'), 'utf8')).toBe('sentinel\n');
   });
 
   test('fails clearly when bundle resources are missing', () => {
