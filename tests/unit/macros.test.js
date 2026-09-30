@@ -119,6 +119,12 @@ describe('Macro URL Expansion (unit)', () => {
     expect(expandMacro('google_search', 'no @ prefix')).toBeNull();
   });
 
+  test('prototype properties are not callable macros', () => {
+    expect(expandMacro('toString', 'test')).toBeNull();
+    expect(expandMacro('constructor', 'test')).toBeNull();
+    expect(expandMacro('__proto__', 'test')).toBeNull();
+  });
+
   test('unicode characters are encoded', () => {
     expect(expandMacro('@google_search', '日本語'))
       .toBe('https://www.google.com/search?q=%E6%97%A5%E6%9C%AC%E8%AA%9E');
