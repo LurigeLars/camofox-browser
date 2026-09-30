@@ -85,12 +85,20 @@ async function readCookieFile({ cookiesDir, cookiesPath, domainSuffix, maxBytes 
     throw new Error('cookiesPath resolves outside the cookies directory');
   }
 
-  const stat = await fs.stat(realCookiePath);
-  if (stat.size > maxBytes) {
-    throw new Error('Cookie file too large (max 5MB)');
+  const handle = await fs.open(realCookiePath, 'r');
+  let text;
+  try {
+    const stat = await handle.stat();
+    if (!stat.isFile()) {
+      throw new Error('Cookie path must identify a file');
+    }
+    if (stat.size > maxBytes) {
+      throw new Error('Cookie file too large (max 5MB)');
+    }
+    text = await handle.readFile('utf8');
+  } finally {
+    await handle.close();
   }
-
-  const text = await fs.readFile(realCookiePath, 'utf8');
   let cookies = parseNetscapeCookieFile(text);
   if (domainSuffix) {
     cookies = cookies.filter((c) => c.domain.endsWith(domainSuffix));
