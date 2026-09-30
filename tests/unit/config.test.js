@@ -11,6 +11,25 @@ afterEach(() => {
 });
 
 describe('loadConfig', () => {
+  test('defaults the API bind host to loopback', () => {
+    delete process.env.CAMOFOX_BIND_HOST;
+    delete process.env.CAMOFOX_ACCESS_KEY;
+
+    expect(loadConfig().bindHost).toBe('127.0.0.1');
+  });
+
+  test('requires the global access key for non-loopback binds', () => {
+    process.env.CAMOFOX_BIND_HOST = '0.0.0.0';
+    delete process.env.CAMOFOX_ACCESS_KEY;
+
+    expect(() => loadConfig()).toThrow('Non-loopback CAMOFOX_BIND_HOST requires CAMOFOX_ACCESS_KEY');
+
+    process.env.CAMOFOX_ACCESS_KEY = 'test-access-key';
+    const config = loadConfig();
+    expect(config.bindHost).toBe('0.0.0.0');
+    expect(config.accessKey).toBe('test-access-key');
+  });
+
   test('reads the optional API bind host and forwards it to server subprocesses', () => {
     process.env.CAMOFOX_BIND_HOST = '127.0.0.1';
 
