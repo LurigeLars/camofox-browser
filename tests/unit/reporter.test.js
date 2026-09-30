@@ -565,16 +565,16 @@ describe('createUrlAnonymizer', () => {
 
   test('handles data/blob/javascript URIs', () => {
     const { anonymizeUrl } = createUrlAnonymizer();
-    expect(anonymizeUrl('data:text/html).toBe(<h1>secret</h1>'));
+    expect(anonymizeUrl('data:text/html,<h1>secret</h1>')).toBe('[data-uri]');
     expect(anonymizeUrl('blob:https://example.com/abc')).toBe('[blob-uri]');
     expect(anonymizeUrl('javascript:alert(1)')).toBe('[javascript-uri]');
+    expect(anonymizeUrl('JAVASCRIPT:alert(1)')).toBe('[javascript-uri]');
   });
 
   test('redacts unsupported executable URL schemes', () => {
     const { anonymizeUrl } = createUrlAnonymizer();
     expect(anonymizeUrl('vbscript:msgbox(1)')).toBe('[other-uri]');
     expect(anonymizeUrl('file:///etc/passwd')).toBe('[other-uri]');
-    expect(anonymizeUrl('JAVASCRIPT:alert(1)')).toBe('[other-uri]');
   });
 
   test('handles empty/null/invalid input', () => {
