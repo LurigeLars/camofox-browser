@@ -80,6 +80,19 @@ describe('importBootstrapCookies', () => {
       .resolves.toEqual([expect.objectContaining({ name: 'logged_in', value: 'yes' })]);
   });
 
+  test('enforces maxBytes on the same opened cookie file', async () => {
+    await fs.writeFile(
+      path.join(tmpDir, 'cookies.txt'),
+      '.example.com\tTRUE\t/\tTRUE\t1700000000\tlogged_in\tyes\n'
+    );
+
+    await expect(readCookieFile({
+      cookiesDir: tmpDir,
+      cookiesPath: 'cookies.txt',
+      maxBytes: 8,
+    })).rejects.toThrow('Cookie file too large');
+  });
+
   test('rejects traversal, absolute paths, and symlinks that resolve outside the cookie directory', async () => {
     const outsideDir = await fs.mkdtemp(path.join(os.tmpdir(), 'camofox-outside-cookies-'));
     const outsideFile = path.join(outsideDir, 'cookies.txt');
