@@ -6,14 +6,14 @@ import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import { expandMacro } from './lib/macros.js';
-import { getSearchFallbacks } from './lib/search-fallbacks.js';
+import { getSearchFallbacks, isSearchEngineResultUrl } from './lib/search-fallbacks.js';
 import { hasGoogleOrganicResults } from './lib/google-serp.js';
 import { loadConfig } from './lib/config.js';
 import { contextIdentityOptions, launchLocale } from './lib/browser-identity.js';
 import { normalizePlaywrightProxy, createProxyPool, buildProxyUrl } from './lib/proxy.js';
 import { createFlyHelpers } from './lib/fly.js';
 import { createPluginEvents, loadPlugins, typeEventPayload } from './lib/plugins.js';
-import { requireAuth, accessKeyMiddleware, timingSafeCompare as _timingSafeCompare, isLoopbackAddress as _isLoopbackAddress } from './lib/auth.js';
+import { requireAuth, accessKeyMiddleware, parseBearerToken, timingSafeCompare as _timingSafeCompare, isLoopbackAddress as _isLoopbackAddress } from './lib/auth.js';
 import { windowSnapshot } from './lib/snapshot.js';
 import { extractPageStructure, attachStructureRefs } from './lib/page-structure.js';
 import {
@@ -414,9 +414,8 @@ app.post('/sessions/:userId/cookies', express.json({ limit: '512kb' }), async (r
   try {
     if (CONFIG.apiKey) {
       const apiKey = CONFIG.apiKey;
-      const auth = String(req.headers['authorization'] || '');
-      const match = auth.match(/^Bearer\s+(.+)$/i);
-      if (!match || !timingSafeCompare(match[1], apiKey)) {
+      const token = parseBearerToken(req.headers['authorization']);
+      if (!token || !timingSafeCompare(token, apiKey)) {
         return res.status(403).json({ error: 'Forbidden' });
       }
     } else {
@@ -505,6 +504,7 @@ const NEW_PAGE_TIMEOUT_MS = CONFIG.newPageTimeoutMs;
 const MAX_CONCURRENT_PER_USER = CONFIG.maxConcurrentPerUser;
 const PAGE_CLOSE_TIMEOUT_MS = 5000;
 const PAGE_FORCE_CLOSE_TIMEOUT_MS = 1000;
+const SESSION_CONTEXT_CLOSE_TIMEOUT_MS = 5000;
 const NAVIGATE_TIMEOUT_MS = CONFIG.navigateTimeoutMs;
 const BUILDREFS_TIMEOUT_MS = CONFIG.buildrefsTimeoutMs;
 const NATIVE_MEM_RESTART_THRESHOLD_MB = CONFIG.nativeMemRestartThresholdMb;
@@ -1309,6 +1309,13 @@ async function closeSession(userId, session, {
 
   const key = normalizeUserId(userId);
 
+  // Remove the session from admission accounting before any async teardown.
+  // A wedged BrowserContext.close() must not consume MAX_SESSIONS forever.
+  session._closing = true;
+  if (sessions.get(key) === session) {
+    sessions.delete(key);
+  }
+
   // Drain locks BEFORE closing context — queued operations get clean "Tab destroyed"
   // (410) instead of messy "Target page closed" (500) errors.
   if (clearLocks) {
@@ -1329,9 +1336,43 @@ async function closeSession(userId, session, {
     }
   }
 
-  await session.context.close().catch(() => {});
-  sessions.delete(key);
+  let contextCloseTimer;
+  let contextCloseFailed = false;
+  try {
+    await Promise.race([
+      session.context.close(),
+      new Promise((_, reject) => {
+        contextCloseTimer = setTimeout(
+          () => reject(new Error('session context close timed out')),
+          SESSION_CONTEXT_CLOSE_TIMEOUT_MS,
+        );
+      }),
+    ]);
+  } catch (err) {
+    contextCloseFailed = true;
+    log('warn', 'session context close failed or timed out', {
+      userId: key,
+      reason,
+      error: err.message,
+    });
+  } finally {
+    clearTimeout(contextCloseTimer);
+  }
+
   await pluginEvents.emitAsync('session:destroyed', { userId: key, reason });
+
+  const suppressRecovery =
+    String(reason).startsWith('browser_restart:') ||
+    String(reason).startsWith('shutdown:') ||
+    reason === 'admin_stop' ||
+    reason === 'idle_shutdown';
+  if (contextCloseFailed && !suppressRecovery && !healthState.isRecovering) {
+    setImmediate(() => {
+      restartBrowser('session_context_close_failed').catch((err) => {
+        log('error', 'browser recovery after session close failure failed', { error: err.message });
+      });
+    });
+  }
 
   refreshActiveTabsGauge();
 }
@@ -1369,7 +1410,11 @@ async function getSession(userId, { trace = false } = {}) {
       if (sessions.size >= MAX_SESSIONS) {
         throw Object.assign(
           new Error('Maximum concurrent sessions reached'),
-          { statusCode: 503, code: 'admission_rejected' }
+          {
+            statusCode: 503,
+            code: 'admission_rejected',
+            admissionReason: 'concurrency_full',
+          }
         );
       }
       // Memory admission control (Fly.io only) — reject new sessions when
@@ -1385,7 +1430,11 @@ async function getSession(userId, { trace = false } = {}) {
           });
           throw Object.assign(
             new Error('Server memory pressure — try again shortly'),
-            { statusCode: 503, code: 'admission_rejected' }
+            {
+              statusCode: 503,
+              code: 'admission_rejected',
+              admissionReason: 'memory_pressure',
+            }
           );
         }
       }
@@ -1997,11 +2046,9 @@ async function isFallbackSearchBlocked(page, engine) {
   const url = page.url();
   const bodyText = await page.evaluate(() => document.body?.innerText?.slice(0, 1000) || '').catch(() => '');
   if (/Unable to connect|502 Bad Gateway or Proxy Error|Camoufox can't establish a connection/i.test(bodyText)) return true;
-  if (engine === 'duckduckgo') {
-    return !/duckduckgo\.com/i.test(url) || /captcha|verify you are human|unusual traffic/i.test(bodyText);
-  }
-  if (engine === 'bing') {
-    return !/bing\.com/i.test(url) || /captcha|verify you are human|unusual traffic/i.test(bodyText);
+  if (engine === 'duckduckgo' || engine === 'bing') {
+    return !isSearchEngineResultUrl(url, engine)
+      || /captcha|verify you are human|unusual traffic/i.test(bodyText);
   }
   return true;
 }
@@ -3020,7 +3067,21 @@ app.post('/tabs', async (req, res) => {
 
     res.json(result);
   } catch (err) {
-    log('error', 'tab create failed', { reqId: req.reqId, error: err.message });
+    log('error', 'tab create failed', {
+      reqId: req.reqId,
+      error: err.message,
+      code: err.code || null,
+      admissionReason: err.admissionReason || null,
+    });
+    if (err.code === 'admission_rejected') {
+      return res.status(503).json({
+        error: err.message,
+        code: 'admission_rejected',
+        reason: err.admissionReason || 'capacity_unavailable',
+        retryable: true,
+        recovery: 'retry',
+      });
+    }
     // SSL certificate errors on initial navigation — non-retriable
     const isSslError = err.message && (
       err.message.includes('SEC_ERROR') ||
@@ -6007,6 +6068,7 @@ app.delete('/sessions/:userId', async (req, res) => {
 setInterval(() => {
   const now = Date.now();
   for (const [userId, session] of Array.from(sessions.entries())) {
+    if (session._closing) continue;
     if (SESSION_TIMEOUT_MS > 0 && now - session.lastAccess > SESSION_TIMEOUT_MS) {
       session._closing = true;
       const idleMs = now - session.lastAccess;
@@ -6073,6 +6135,7 @@ if (FLY_MACHINE_ID) {
 setInterval(() => {
   const now = Date.now();
   for (const [userId, session] of sessions) {
+    if (session._closing) continue;
     for (const [listItemId, group] of session.tabGroups) {
       for (const [tabId, tabState] of group) {
         if (!tabState._lastReaperCheck) {
