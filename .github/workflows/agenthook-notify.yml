@@ -13,11 +13,11 @@ on:
         type: string
     secrets:
       AGENTHOOK_URL:
-        required: true
+        required: false
       AGENTHOOK_TOKEN:
-        required: true
+        required: false
       AGENTHOOK_TOPIC:
-        required: true
+        required: false
 
 permissions: {}
 
@@ -26,6 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Notify agenthook
+        continue-on-error: true
         env:
           AGENTHOOK_URL: ${{ secrets.AGENTHOOK_URL }}
           AGENTHOOK_TOKEN: ${{ secrets.AGENTHOOK_TOKEN }}
@@ -33,8 +34,13 @@ jobs:
           EVENT_KIND: ${{ inputs.kind }}
           RESULTS: ${{ inputs.results }}
         run: |
+          if [ -z "$AGENTHOOK_URL" ] || [ -z "$AGENTHOOK_TOKEN" ] || [ -z "$AGENTHOOK_TOPIC" ]; then
+            echo "::notice::Agenthook telemetry is not configured; skipping notification."
+            exit 0
+          fi
+
           status=$(jq -r '[.[] | .result] | if index("failure") then "failure" elif index("cancelled") then "cancelled" else "success" end' <<< "$RESULTS")
-          curl --fail --silent --show-error --retry 3 \
+          curl --fail --silent --show-error --retry 2 --connect-timeout 5 --max-time 15 \
             --request POST \
             --header "Authorization: Bearer ${AGENTHOOK_TOKEN}" \
             --header "Content-Type: application/json" \
