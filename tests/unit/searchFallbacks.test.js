@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { getSearchFallbacks } from '../../lib/search-fallbacks.js';
+import { getSearchFallbacks, isSearchEngineResultUrl } from '../../lib/search-fallbacks.js';
 
 const serverSource = fs.readFileSync(path.join(process.cwd(), 'server.js'), 'utf8');
 
@@ -26,6 +26,16 @@ describe('search fallbacks', () => {
   test('encodes the fallback query', () => {
     expect(getSearchFallbacks('@google_search', 'C++ & Rust')[0].url)
       .toBe('https://duckduckgo.com/?q=C%2B%2B%20%26%20Rust');
+  });
+
+  test('validates fallback hosts structurally instead of by substring', () => {
+    expect(isSearchEngineResultUrl('https://duckduckgo.com/?q=x', 'duckduckgo')).toBe(true);
+    expect(isSearchEngineResultUrl('https://html.duckduckgo.com/html/?q=x', 'duckduckgo')).toBe(true);
+    expect(isSearchEngineResultUrl('https://www.bing.com/search?q=x', 'bing')).toBe(true);
+    expect(isSearchEngineResultUrl('https://duckduckgo.com.evil.example/?q=x', 'duckduckgo')).toBe(false);
+    expect(isSearchEngineResultUrl('https://evilduckduckgo.com/?q=x', 'duckduckgo')).toBe(false);
+    expect(isSearchEngineResultUrl('https://bing.com.evil.example/search?q=x', 'bing')).toBe(false);
+    expect(isSearchEngineResultUrl('not a url', 'bing')).toBe(false);
   });
 
   test('waits for organic Google result cards before falling back', () => {
