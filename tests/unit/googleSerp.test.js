@@ -1,5 +1,19 @@
 import { describe, expect, jest, test } from '@jest/globals';
+import fs from 'fs';
+import path from 'path';
 import { hasGoogleOrganicResults } from '../../lib/google-serp.js';
+
+describe('Google snapshot escaping', () => {
+  test('escapes backslashes before quotes in quoted snapshot fields', () => {
+    const serverSource = fs.readFileSync(path.join(process.cwd(), 'server.js'), 'utf8');
+    expect(serverSource).toContain("function escapeSnapshotText(value)");
+    expect(serverSource).toContain(".split('\\\\').join('\\\\\\\\')");
+    expect(serverSource).toContain(".split('\\"').join('\\\\\\"')");
+    expect(serverSource).toContain("escapeSnapshotText(document.title)");
+    expect(serverSource).toContain("escapeSnapshotText(title)");
+    expect(serverSource).toContain("escapeSnapshotText(text)");
+  });
+});
 
 describe('hasGoogleOrganicResults', () => {
   test('returns immediately when an organic card is present', async () => {
