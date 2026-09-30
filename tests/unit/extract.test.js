@@ -99,6 +99,15 @@ describe('validateSchema', () => {
     expect(r.error).toMatch(/nope/);
   });
 
+  test('rejects prototype-sensitive property names', () => {
+    for (const prop of ['__proto__', 'prototype', 'constructor']) {
+      const properties = JSON.parse(`{"${prop}":{"type":"string","x-ref":"e1"}}`);
+      const result = validateSchema({ type: 'object', properties });
+      expect(result.ok).toBe(false);
+      expect(result.error).toMatch(/not allowed/);
+    }
+  });
+
   test('accepts well-formed schema', () => {
     expect(validateSchema({
       type: 'object',
