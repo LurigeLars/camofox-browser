@@ -139,7 +139,15 @@ describe('lib/downloads', () => {
 
       releaseSave();
       await save;
+
+      expect(tabState.downloads).toHaveLength(1);
+      const record = tabState.downloads[0];
+      expect(path.basename(record.tempDir)).toMatch(/^camofox-download-/);
+      expect(path.dirname(record.filePath)).toBe(record.tempDir);
+      await expect(fs.stat(record.tempDir)).resolves.toBeDefined();
+
       await clearTabDownloads(tabState);
+      await expect(fs.stat(record.tempDir)).rejects.toThrow();
     });
   });
 
