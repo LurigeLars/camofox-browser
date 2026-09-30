@@ -574,7 +574,7 @@ describe('createUrlAnonymizer', () => {
     const { anonymizeUrl } = createUrlAnonymizer();
     expect(anonymizeUrl('vbscript:msgbox(1)')).toBe('[other-uri]');
     expect(anonymizeUrl('file:///etc/passwd')).toBe('[other-uri]');
-    expect(anonymizeUrl('JAVASCRIPT:alert(1)')).toBe('[other-uri]');
+    expect(anonymizeUrl('JAVASCRIPT:alert(1)')).toBe('[javascript-uri]');
   });
 
   test('handles empty/null/invalid input', () => {
