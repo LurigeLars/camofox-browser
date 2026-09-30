@@ -8,7 +8,24 @@ updates:
       day: "monday"
       time: "07:00"
       timezone: "Europe/Stockholm"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 2
+    groups:
+      root-npm:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "npm"
+    directory: "/mcp"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "07:05"
+      timezone: "Europe/Stockholm"
+    open-pull-requests-limit: 2
+    groups:
+      mcp-npm:
+        patterns:
+          - "*"
 
   - package-ecosystem: "docker"
     directory: "/"
@@ -17,7 +34,11 @@ updates:
       day: "monday"
       time: "07:15"
       timezone: "Europe/Stockholm"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 2
+    groups:
+      docker:
+        patterns:
+          - "*"
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -26,4 +47,8 @@ updates:
       day: "monday"
       time: "07:30"
       timezone: "Europe/Stockholm"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 2
+    groups:
+      github-actions:
+        patterns:
+          - "*"
