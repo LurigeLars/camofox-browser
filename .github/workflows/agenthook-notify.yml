@@ -26,6 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Notify agenthook
+        continue-on-error: true
         env:
           AGENTHOOK_URL: ${{ secrets.AGENTHOOK_URL }}
           AGENTHOOK_TOKEN: ${{ secrets.AGENTHOOK_TOKEN }}
@@ -34,7 +35,7 @@ jobs:
           RESULTS: ${{ inputs.results }}
         run: |
           status=$(jq -r '[.[] | .result] | if index("failure") then "failure" elif index("cancelled") then "cancelled" else "success" end' <<< "$RESULTS")
-          curl --fail --silent --show-error --retry 3 \
+          curl --fail --silent --show-error --retry 2 --connect-timeout 5 --max-time 15 \
             --request POST \
             --header "Authorization: Bearer ${AGENTHOOK_TOKEN}" \
             --header "Content-Type: application/json" \
