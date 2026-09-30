@@ -31,6 +31,25 @@ General Kenobi`;
     expect(result).toBe('[00:00] First line\n[01:05] Second line');
   });
 
+  test('parseVtt strips markup without double-decoding entities', () => {
+    const vtt = `WEBVTT
+
+00:00:01.000 --> 00:00:04.000
+<b>Hello</b> &amp;lt;script&amp;gt; &lt;b&gt;`;
+    const result = parseVtt(vtt);
+    expect(result).toBe('[00:01] Hello &lt;script&gt; &lt;b&gt;');
+    expect(result).not.toContain('<script>');
+    expect(result).not.toContain('<b>');
+  });
+
+  test('parseXml strips markup without reintroducing encoded tags', () => {
+    const xml = '<text start="0" dur="3"><b>Hello</b> &amp;lt;script&amp;gt; &lt;b&gt;</text>';
+    const result = parseXml(xml);
+    expect(result).toBe('[00:00] Hello &lt;script&gt; &lt;b&gt;');
+    expect(result).not.toContain('<script>');
+    expect(result).not.toContain('<b>');
+  });
+
   test('parseJson3 handles empty events', () => {
     expect(parseJson3(JSON.stringify({ events: [] }))).toBe('');
   });

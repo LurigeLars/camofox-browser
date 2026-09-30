@@ -228,6 +228,40 @@ function parseJson3(content) {
   }
 }
 
+function stripCaptionMarkup(value) {
+  const input = String(value || '');
+  let result = '';
+  let offset = 0;
+  while (offset < input.length) {
+    const open = input.indexOf('<', offset);
+    if (open < 0) {
+      result += input.slice(offset);
+      break;
+    }
+    result += input.slice(offset, open);
+    const close = input.indexOf('>', open + 1);
+    if (close < 0) {
+      result += input.slice(open);
+      break;
+    }
+    offset = close + 1;
+  }
+  return result;
+}
+
+function decodeCaptionEntitiesOnce(value) {
+  return String(value || '').replace(/&(amp|quot|#39|lt|gt);/g, (match, entity) => {
+    if (entity === 'amp') return '&';
+    if (entity === 'quot') return '"';
+    if (entity === '#39') return "'";
+    return match;
+  });
+}
+
+function cleanCaptionText(value) {
+  return decodeCaptionEntitiesOnce(stripCaptionMarkup(value)).trim();
+}
+
 function parseVtt(content) {
   const lines = content.split('\n');
   const result = [];
@@ -247,14 +281,7 @@ function parseVtt(content) {
       if (parts[0]) currentTimestamp = formatVttTs(parts[0].trim());
       continue;
     }
-    const text = stripped
-      .replace(/<[^>]+>/g, '')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .trim();
+    const text = cleanCaptionText(stripped);
     if (text && currentTimestamp) {
       result.push(`[${currentTimestamp}] ${text}`);
       currentTimestamp = '';
@@ -268,14 +295,7 @@ function parseXml(content) {
   const regex = /<text\s+start="([^"]*)"[^>]*>([\s\S]*?)<\/text>/g;
   for (const match of content.matchAll(regex)) {
     const startSec = parseFloat(match[1]) || 0;
-    const text = match[2]
-      .replace(/<[^>]+>/g, '')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .trim();
+    const text = cleanCaptionText(match[2]);
     if (!text) continue;
     const mm = Math.floor(startSec / 60);
     const ss = Math.floor(startSec % 60);

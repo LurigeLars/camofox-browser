@@ -2265,8 +2265,14 @@ async function extractGoogleSerp(page) {
       elements.push({ id, role, name });
       return id;
     }
+
+    function escapeSnapshotText(value) {
+      return String(value || '')
+        .split('\\').join('\\\\')
+        .split('"').join('\\"');
+    }
     
-    snapshot.push('- heading "' + document.title.replace(/"/g, '\\"') + '"');
+    snapshot.push('- heading "' + escapeSnapshotText(document.title) + '"');
     
     const searchInput = document.querySelector('input[name="q"], textarea[name="q"]');
     if (searchInput) {
@@ -2285,7 +2291,7 @@ async function extractGoogleSerp(page) {
           if (!text || text.length < 1) return;
           if (/^\d+$/.test(text) && parseInt(text) < 50) return;
           const refId = addRef('link', text);
-          snapshot.push('  - link "' + text + '" [' + refId + ']');
+          snapshot.push('  - link "' + escapeSnapshotText(text) + '" [' + refId + ']');
         });
       }
     }
@@ -2306,7 +2312,7 @@ async function extractGoogleSerp(page) {
           || mainLink.parentElement?.parentElement
           || mainLink.parentElement
           || resultContainer;
-        const title = h3.textContent.trim().replace(/"/g, '\\"');
+        const title = h3.textContent.trim();
         if (!title) continue;
         const href = mainLink.href;
         const cite = block.querySelector('cite');
@@ -2325,7 +2331,7 @@ async function extractGoogleSerp(page) {
         }
 
         const refId = addRef('link', title);
-        snapshot.push('- link "' + title + '" [' + refId + ']:');
+        snapshot.push('- link "' + escapeSnapshotText(title) + '" [' + refId + ']:');
         snapshot.push('  - /url: ' + href);
         if (displayUrl) snapshot.push('  - cite: ' + displayUrl);
         if (snippet) snapshot.push('  - text: ' + snippet);
@@ -2336,10 +2342,10 @@ async function extractGoogleSerp(page) {
     if (paaItems.length > 0) {
       snapshot.push('- heading "People also ask"');
       paaItems.forEach(q => {
-        const text = (q.textContent || '').trim().replace(/"/g, '\\"').slice(0, 150);
+        const text = (q.textContent || '').trim().slice(0, 150);
         if (text) {
           const refId = addRef('button', text);
-          snapshot.push('  - button "' + text + '" [' + refId + ']');
+          snapshot.push('  - button "' + escapeSnapshotText(text) + '" [' + refId + ']');
         }
       });
     }
