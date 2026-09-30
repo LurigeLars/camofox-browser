@@ -3,9 +3,19 @@
  */
 import { describe, test, expect } from '@jest/globals';
 import { jest } from '@jest/globals';
-import { timingSafeCompare, isLoopbackAddress, requireAuth } from '../../lib/auth.js';
+import { timingSafeCompare, isLoopbackAddress, parseBearerToken, requireAuth } from '../../lib/auth.js';
 
 describe('lib/auth', () => {
+  describe('parseBearerToken', () => {
+    test('parses case-insensitive bearer tokens without regex backtracking', () => {
+      expect(parseBearerToken('Bearer secret')).toBe('secret');
+      expect(parseBearerToken('bearer   secret  ')).toBe('secret');
+      expect(parseBearerToken('Basic secret')).toBeNull();
+      expect(parseBearerToken('Bearer')).toBeNull();
+      expect(parseBearerToken('Bearer ' + ' '.repeat(100000))).toBeNull();
+    });
+  });
+
   describe('timingSafeCompare', () => {
     test('returns true for matching strings', () => {
       expect(timingSafeCompare('secret', 'secret')).toBe(true);
