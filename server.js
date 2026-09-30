@@ -6,14 +6,14 @@ import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import { expandMacro } from './lib/macros.js';
-import { getSearchFallbacks } from './lib/search-fallbacks.js';
+import { getSearchFallbacks, isSearchEngineResultUrl } from './lib/search-fallbacks.js';
 import { hasGoogleOrganicResults } from './lib/google-serp.js';
 import { loadConfig } from './lib/config.js';
 import { contextIdentityOptions, launchLocale } from './lib/browser-identity.js';
 import { normalizePlaywrightProxy, createProxyPool, buildProxyUrl } from './lib/proxy.js';
 import { createFlyHelpers } from './lib/fly.js';
 import { createPluginEvents, loadPlugins, typeEventPayload } from './lib/plugins.js';
-import { requireAuth, accessKeyMiddleware, timingSafeCompare as _timingSafeCompare, isLoopbackAddress as _isLoopbackAddress } from './lib/auth.js';
+import { requireAuth, accessKeyMiddleware, parseBearerToken, timingSafeCompare as _timingSafeCompare, isLoopbackAddress as _isLoopbackAddress } from './lib/auth.js';
 import { windowSnapshot } from './lib/snapshot.js';
 import { extractPageStructure, attachStructureRefs } from './lib/page-structure.js';
 import {
@@ -414,9 +414,8 @@ app.post('/sessions/:userId/cookies', express.json({ limit: '512kb' }), async (r
   try {
     if (CONFIG.apiKey) {
       const apiKey = CONFIG.apiKey;
-      const auth = String(req.headers['authorization'] || '');
-      const match = auth.match(/^Bearer\s+(.+)$/i);
-      if (!match || !timingSafeCompare(match[1], apiKey)) {
+      const token = parseBearerToken(req.headers['authorization']);
+      if (!token || !timingSafeCompare(token, apiKey)) {
         return res.status(403).json({ error: 'Forbidden' });
       }
     } else {
@@ -2047,11 +2046,9 @@ async function isFallbackSearchBlocked(page, engine) {
   const url = page.url();
   const bodyText = await page.evaluate(() => document.body?.innerText?.slice(0, 1000) || '').catch(() => '');
   if (/Unable to connect|502 Bad Gateway or Proxy Error|Camoufox can't establish a connection/i.test(bodyText)) return true;
-  if (engine === 'duckduckgo') {
-    return !/duckduckgo\.com/i.test(url) || /captcha|verify you are human|unusual traffic/i.test(bodyText);
-  }
-  if (engine === 'bing') {
-    return !/bing\.com/i.test(url) || /captcha|verify you are human|unusual traffic/i.test(bodyText);
+  if (engine === 'duckduckgo' || engine === 'bing') {
+    return !isSearchEngineResultUrl(url, engine)
+      || /captcha|verify you are human|unusual traffic/i.test(bodyText);
   }
   return true;
 }
