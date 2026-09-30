@@ -1,0 +1,87 @@
+name: Upstream fork watch
+
+on:
+  schedule:
+    - cron: "17 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      UPSTREAM_REPO: jo-inc/camofox-browser
+      UPSTREAM_BRANCH: master
+      LOCAL_BRANCH: master
+      ISSUE_TITLE: "Dependency watch: upstream fork drift"
+    steps:
+      - name: Compare fork with upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          upstream_owner="${UPSTREAM_REPO%%/*}"
+          compare="$(gh api "repos/${GITHUB_REPOSITORY}/compare/${upstream_owner}:${UPSTREAM_BRANCH}...${LOCAL_BRANCH}")"
+          local_ahead="$(jq -r '.ahead_by' <<<"$compare")"
+          local_behind="$(jq -r '.behind_by' <<<"$compare")"
+          status="$(jq -r '.status' <<<"$compare")"
+          upstream_sha="$(gh api "repos/${UPSTREAM_REPO}/commits/${UPSTREAM_BRANCH}" --jq '.sha')"
+          local_sha="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${LOCAL_BRANCH}" --jq '.sha')"
+          compare_url="https://github.com/${GITHUB_REPOSITORY}/compare/${upstream_owner}:${UPSTREAM_BRANCH}...${LOCAL_BRANCH}"
+
+          if (( local_behind > 0 )); then
+            body="$(cat <<EOF
+          The fork is behind its configured upstream branch.
+
+          - upstream: \`${UPSTREAM_REPO}@${UPSTREAM_BRANCH}\`
+          - local branch: \`${GITHUB_REPOSITORY}@${LOCAL_BRANCH}\`
+          - upstream-only commits: \`${local_behind}\`
+          - local-only commits: \`${local_ahead}\`
+          - compare status: \`${status}\`
+          - upstream head: \`${upstream_sha}\`
+          - local head: \`${local_sha}\`
+          - compare: ${compare_url}
+
+          Signal only: review upstream changes before syncing. This watcher never merges, rebases, or deploys.
+          EOF
+          )"
+          else
+            body="$(cat <<EOF
+          The fork contains the configured upstream branch.
+
+          - upstream: \`${UPSTREAM_REPO}@${UPSTREAM_BRANCH}\`
+          - local branch: \`${GITHUB_REPOSITORY}@${LOCAL_BRANCH}\`
+          - upstream-only commits: \`0\`
+          - local-only commits: \`${local_ahead}\`
+          - compare status: \`${status}\`
+          - upstream head: \`${upstream_sha}\`
+          - local head: \`${local_sha}\`
+          - compare: ${compare_url}
+
+          Status: current with upstream. This watcher never merges, rebases, or deploys.
+          EOF
+          )"
+          fi
+
+          issues="$(gh api "repos/${GITHUB_REPOSITORY}/issues?state=all&per_page=100")"
+          issue_number="$(jq -r --arg title "$ISSUE_TITLE" '.[] | select(.pull_request == null and .title == $title) | .number' <<<"$issues" | head -n1)"
+          issue_state="$(jq -r --arg title "$ISSUE_TITLE" '.[] | select(.pull_request == null and .title == $title) | .state' <<<"$issues" | head -n1)"
+
+          if (( local_behind > 0 )); then
+            if [[ -n "$issue_number" ]]; then
+              gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/${issue_number}" \
+                -f body="$body" -f state="open" >/dev/null
+            else
+              gh api --method POST "repos/${GITHUB_REPOSITORY}/issues" \
+                -f title="$ISSUE_TITLE" -f body="$body" >/dev/null
+            fi
+          elif [[ -n "$issue_number" && "$issue_state" == "open" ]]; then
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/${issue_number}" \
+              -f body="$body" -f state="closed" >/dev/null
+          fi
