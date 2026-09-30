@@ -34,8 +34,22 @@ jobs:
           upstream_sha="$(gh api "repos/${UPSTREAM_REPO}/commits/${UPSTREAM_BRANCH}" --jq '.sha')"
           local_sha="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${LOCAL_BRANCH}" --jq '.sha')"
           compare_url="https://github.com/${GITHUB_REPOSITORY}/compare/${upstream_owner}:${UPSTREAM_BRANCH}...${LOCAL_BRANCH}"
+          has_issues="$(gh api "repos/${GITHUB_REPOSITORY}" --jq '.has_issues')"
+
+          {
+            echo "## Upstream fork watch"
+            echo
+            echo "- upstream: \`${UPSTREAM_REPO}@${UPSTREAM_BRANCH}\`"
+            echo "- local: \`${GITHUB_REPOSITORY}@${LOCAL_BRANCH}\`"
+            echo "- upstream-only commits: \`${local_behind}\`"
+            echo "- local-only commits: \`${local_ahead}\`"
+            echo "- compare status: \`${status}\`"
+            echo "- compare: ${compare_url}"
+          } >> "$GITHUB_STEP_SUMMARY"
 
           if (( local_behind > 0 )); then
+            echo "::warning title=Upstream fork drift::${local_behind} upstream-only commits require review."
+
             body="$(cat <<EOF
           The fork is behind its configured upstream branch.
 
@@ -67,6 +81,11 @@ jobs:
           Status: current with upstream. This watcher never merges, rebases, or deploys.
           EOF
           )"
+          fi
+
+          if [[ "$has_issues" != "true" ]]; then
+            echo "Issues are disabled for this repository; Actions summary is the persistent signal." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
 
           issues="$(gh api "repos/${GITHUB_REPOSITORY}/issues?state=all&per_page=100")"
