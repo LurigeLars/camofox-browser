@@ -8,7 +8,7 @@ describe('Google snapshot escaping', () => {
     const serverSource = fs.readFileSync(path.join(process.cwd(), 'server.js'), 'utf8');
     expect(serverSource).toContain("function escapeSnapshotText(value)");
     expect(serverSource).toContain(".split('\\\\').join('\\\\\\\\')");
-    expect(serverSource).toContain(".split('\\"').join('\\\\\\"')");
+    expect(serverSource).toContain(String.raw`.split('"').join('\\"')`);
     expect(serverSource).toContain("escapeSnapshotText(document.title)");
     expect(serverSource).toContain("escapeSnapshotText(title)");
     expect(serverSource).toContain("escapeSnapshotText(text)");
