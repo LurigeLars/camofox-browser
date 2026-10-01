@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from '@jest/globals';
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { platform, tmpdir } from 'os';
 import { prepareExternalCamoufoxExecutable } from '../../lib/camoufox-executable.js';
@@ -60,6 +60,40 @@ describe('prepareExternalCamoufoxExecutable', () => {
     prepareExternalCamoufoxExecutable(executable, { cacheDir });
 
     expect(existsSync(join(cacheDir, 'version.json'))).toBe(true);
+  });
+
+  test('accepts an already-created cache symlink only when it targets the expected resource', () => {
+    const bundleDir = makeTempDir();
+    const cacheDir = makeTempDir();
+    const executable = join(bundleDir, 'camoufox-bin');
+
+    writeFileSync(executable, '#!/bin/sh\nexit 0\n');
+    chmodSync(executable, 0o755);
+    writeFileSync(join(bundleDir, 'properties.json'), '[]\n');
+    writeFileSync(join(bundleDir, 'version.json'), '{"version":"new"}\n');
+    mkdirSync(join(bundleDir, 'fontconfig', 'lin'), { recursive: true });
+
+    symlinkSync(join(bundleDir, 'properties.json'), join(cacheDir, 'properties.json'));
+    expect(() => prepareExternalCamoufoxExecutable(executable, { cacheDir })).not.toThrow();
+  });
+
+  test('fails closed when an existing cache link points somewhere unexpected', () => {
+    const bundleDir = makeTempDir();
+    const cacheDir = makeTempDir();
+    const outsideDir = makeTempDir();
+    const executable = join(bundleDir, 'camoufox-bin');
+    const outsideProperties = join(outsideDir, 'properties.json');
+
+    writeFileSync(executable, '#!/bin/sh\nexit 0\n');
+    chmodSync(executable, 0o755);
+    writeFileSync(join(bundleDir, 'properties.json'), '[]\n');
+    writeFileSync(join(bundleDir, 'version.json'), '{"version":"new"}\n');
+    mkdirSync(join(bundleDir, 'fontconfig', 'lin'), { recursive: true });
+    writeFileSync(outsideProperties, '[]\n');
+    symlinkSync(outsideProperties, join(cacheDir, 'properties.json'));
+
+    expect(() => prepareExternalCamoufoxExecutable(executable, { cacheDir }))
+      .toThrow(/unexpected target/);
   });
 
   test('fails clearly when bundle resources are missing', () => {
