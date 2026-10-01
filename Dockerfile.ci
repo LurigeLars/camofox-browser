@@ -1,7 +1,7 @@
 # CI/CD Dockerfile — downloads binaries during build (no bind mounts needed).
 # For local builds with pre-downloaded binaries, use the default Dockerfile + Makefile.
 
-FROM node:22-trixie-slim
+FROM node:26-trixie-slim
 
 ARG CAMOUFOX_VERSION=152.0.4
 ARG CAMOUFOX_RELEASE=beta.28
