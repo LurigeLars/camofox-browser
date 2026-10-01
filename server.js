@@ -2,6 +2,7 @@ import { Camoufox, launchOptions } from 'camoufox-js';
 import { VirtualDisplay } from 'camoufox-js/dist/virtdisplay.js';
 import { firefox } from 'playwright-core';
 import express from 'express';
+import { rateLimit } from 'express-rate-limit';
 import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
@@ -65,6 +66,15 @@ import {
 } from './lib/browser-errors.js';
 
 const CONFIG = loadConfig();
+
+const TRACE_READ_RATE_LIMIT = rateLimit({
+  windowMs: 60_000,
+  limit: 60,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { error: 'too many trace download requests; retry later' },
+});
+
 
 // --- Crash reporter (opt-in, anonymized GitHub issues) ---
 import { readFileSync } from 'fs';
@@ -5924,7 +5934,7 @@ app.get('/sessions/:userId/traces', authMiddleware(), async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-app.get('/sessions/:userId/traces/:filename', authMiddleware(), async (req, res) => {
+app.get('/sessions/:userId/traces/:filename', authMiddleware(), TRACE_READ_RATE_LIMIT, async (req, res) => {
   try {
     const userId = normalizeUserId(req.params.userId);
     const full = resolveTracePath(CONFIG.tracesDir, userId, req.params.filename);
