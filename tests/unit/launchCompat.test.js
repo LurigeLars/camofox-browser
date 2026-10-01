@@ -92,7 +92,7 @@ describe('launch compatibility source contract', () => {
 
     expect(geoipFallback).toMatch(/GeoLite\|MaxMind\|geolocation/);
     expect(geoipFallback).toContain('public proxy IP address');
-    expect(serverSource).toContain('GEOIP_SETUP_TIMEOUT_MS = 10000');
+    expect(serverSource).toContain('GEOIP_SETUP_TIMEOUT_MS = CONFIG.geoipSetupTimeoutMs');
     expect(geoipFallback).toContain("withTimeout(launchOptions(baseOptions), GEOIP_SETUP_TIMEOUT_MS, 'GeoIP setup')");
     expect(geoipFallback).toContain('geoip: false');
     expect(launchBrowser).toContain('buildLaunchOptionsWithGeoipFallback');
