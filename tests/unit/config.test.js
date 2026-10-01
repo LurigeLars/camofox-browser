@@ -114,6 +114,22 @@ describe('loadConfig', () => {
     expect(loadConfig().browserIdleTimeoutMs).toBe(300000);
   });
 
+  test('configures and bounds GeoIP setup timeout', () => {
+    delete process.env.GEOIP_SETUP_TIMEOUT_MS;
+    expect(loadConfig().geoipSetupTimeoutMs).toBe(10000);
+
+    process.env.GEOIP_SETUP_TIMEOUT_MS = '30000';
+    let config = loadConfig();
+    expect(config.geoipSetupTimeoutMs).toBe(30000);
+    expect(config.serverEnv.GEOIP_SETUP_TIMEOUT_MS).toBe('30000');
+
+    process.env.GEOIP_SETUP_TIMEOUT_MS = '0';
+    expect(loadConfig().geoipSetupTimeoutMs).toBe(10000);
+
+    process.env.GEOIP_SETUP_TIMEOUT_MS = '999999';
+    expect(loadConfig().geoipSetupTimeoutMs).toBe(120000);
+  });
+
   test('configures browser RSS restart threshold', () => {
     delete process.env.BROWSER_RSS_RESTART_THRESHOLD_MB;
     expect(loadConfig().browserRssRestartThresholdMb).toBe(1500);
