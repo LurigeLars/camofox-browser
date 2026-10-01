@@ -171,7 +171,7 @@
     },
     "qs": "6.16.0",
     "fast-uri": "3.1.8",
-    "hono": "4.13.5",
+    "hono": "4.13.7",
     "express-rate-limit": {
       "ip-address": "10.7.2"
     },
