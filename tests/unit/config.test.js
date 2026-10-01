@@ -127,7 +127,7 @@ describe('loadConfig', () => {
     expect(loadConfig().geoipSetupTimeoutMs).toBe(10000);
 
     process.env.GEOIP_SETUP_TIMEOUT_MS = '999999';
-    expect(loadConfig().geoipSetupTimeoutMs).toBe(120000);
+    expect(loadConfig().geoipSetupTimeoutMs).toBe(60000);
   });
 
   test('configures browser RSS restart threshold', () => {
