@@ -1109,7 +1109,7 @@ function _countActiveHandles() {
   try { return process._getActiveHandles().length; } catch { return null; }
 }
 
-const GEOIP_SETUP_TIMEOUT_MS = 10000;
+const GEOIP_SETUP_TIMEOUT_MS = CONFIG.geoipSetupTimeoutMs;
 
 function isCamoufoxGeoipError(err) {
   return /Invalid locale:|GeoLite|MaxMind|geolocation|public proxy IP address|GeoIP setup timed out/i.test(err?.message || String(err || ''));
