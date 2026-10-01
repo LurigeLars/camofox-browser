@@ -45,7 +45,22 @@ describe('prepareExternalCamoufoxExecutable', () => {
     expect(existsSync(cacheExecutable)).toBe(true);
   });
 
-  test('preserves an existing cache version during compatibility setup', () => {
+  test('accepts an existing cache version only when it matches the bundle', () => {
+    const bundleDir = makeTempDir();
+    const cacheDir = makeTempDir();
+    const executable = join(bundleDir, 'camoufox-bin');
+
+    writeFileSync(executable, '#!/bin/sh\nexit 0\n');
+    chmodSync(executable, 0o755);
+    writeFileSync(join(bundleDir, 'properties.json'), '[]\n');
+    writeFileSync(join(bundleDir, 'version.json'), '{"version":"new"}\n');
+    mkdirSync(join(bundleDir, 'fontconfig', 'lin'), { recursive: true });
+    writeFileSync(join(cacheDir, 'version.json'), '{"version":"new"}\n');
+
+    expect(() => prepareExternalCamoufoxExecutable(executable, { cacheDir })).not.toThrow();
+  });
+
+  test('fails closed when an existing cache version does not match the bundle', () => {
     const bundleDir = makeTempDir();
     const cacheDir = makeTempDir();
     const executable = join(bundleDir, 'camoufox-bin');
@@ -57,9 +72,8 @@ describe('prepareExternalCamoufoxExecutable', () => {
     mkdirSync(join(bundleDir, 'fontconfig', 'lin'), { recursive: true });
     writeFileSync(join(cacheDir, 'version.json'), '{"version":"existing"}\n');
 
-    prepareExternalCamoufoxExecutable(executable, { cacheDir });
-
-    expect(existsSync(join(cacheDir, 'version.json'))).toBe(true);
+    expect(() => prepareExternalCamoufoxExecutable(executable, { cacheDir }))
+      .toThrow(/cache version does not match/);
   });
 
   test('accepts an already-created cache symlink only when it targets the expected resource', () => {
