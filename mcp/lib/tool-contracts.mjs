@@ -1,7 +1,7 @@
 /**
  * Canonical tool contracts for the camofox-browser REST API.
  *
- * Single source of truth shared by two hosts that expose the same 11 tools:
+ * Single source of truth shared by two hosts that expose the same 13 tools:
  *   - mcp/server.mjs   (stdio MCP server for Claude Code, Codex, agy, Cursor, opencode)
  *   - plugin.ts        (OpenClaw plugin)
  *
@@ -64,7 +64,7 @@ const SEARCH_MACROS = [
 ];
 
 /**
- * The 11 tools, identical schema for both hosts. Edit here and both update.
+ * The 13 tools, identical schema for both hosts. Edit here and both update.
  * @type {ToolDef[]}
  */
 export const TOOL_DEFS = [
@@ -165,6 +165,32 @@ export const TOOL_DEFS = [
       type: 'object',
       properties: {
         tabId: { type: 'string', description: 'Tab identifier' },
+      },
+      required: ['tabId'],
+    },
+  },
+  {
+    name: 'camofox_network',
+    description:
+      'Read recent sanitized request, response, failure, and WebSocket metadata for a Camoufox tab. Headers, cookies, request/response bodies, and credential-like query values are never returned.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tabId: { type: 'string', description: 'Tab identifier' },
+        limit: { type: 'integer', minimum: 1, maximum: 200, default: 100, description: 'Maximum recent events to return' },
+      },
+      required: ['tabId'],
+    },
+  },
+  {
+    name: 'camofox_console',
+    description:
+      'Read recent sanitized console and page-error messages for a Camoufox tab. Common credential patterns are redacted and message lengths are bounded.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tabId: { type: 'string', description: 'Tab identifier' },
+        limit: { type: 'integer', minimum: 1, maximum: 200, default: 100, description: 'Maximum recent events to return' },
       },
       required: ['tabId'],
     },
@@ -310,6 +336,26 @@ export function buildRequest(name, args, ctx) {
         auth: 'accessKey',
         responseKind: 'image',
       };
+    case 'camofox_network': {
+      const params = new URLSearchParams({ userId });
+      if (args.limit != null && args.limit !== '') params.set('limit', String(args.limit));
+      return {
+        method: 'GET',
+        path: `/tabs/${args.tabId}/network?${params}`,
+        auth: 'accessKey',
+        responseKind: 'json',
+      };
+    }
+    case 'camofox_console': {
+      const params = new URLSearchParams({ userId });
+      if (args.limit != null && args.limit !== '') params.set('limit', String(args.limit));
+      return {
+        method: 'GET',
+        path: `/tabs/${args.tabId}/console?${params}`,
+        auth: 'accessKey',
+        responseKind: 'json',
+      };
+    }
     case 'camofox_close_tab':
       return {
         method: 'DELETE',
