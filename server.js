@@ -70,6 +70,7 @@ import {
   readConsoleEvents,
   sanitizeObservedUrl,
 } from './lib/browser-observability.js';
+import { installPublicNetworkGuard } from './lib/network-safety.js';
 
 const CONFIG = loadConfig();
 
@@ -1473,7 +1474,8 @@ async function getSession(userId, { trace = false } = {}) {
         log('info', 'session proxy assigned', { userId: key, proxy: sessionProxy.server });
       }
       await pluginEvents.emitAsync('session:creating', { userId: key, contextOptions });
-      const context = await b.newContext(contextOptions);
+      const context = await b.newContext({ ...contextOptions, serviceWorkers: 'block' });
+      await installPublicNetworkGuard(context);
 
       let tracePath = null;
       if (trace) {
