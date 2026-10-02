@@ -78,7 +78,7 @@ describe('network safety', () => {
     };
     await handler(route);
 
-    expect(route.continue).toHaveBeenCalledOnce();
+    expect(route.continue).toHaveBeenCalledTimes(1);
     expect(route.abort).not.toHaveBeenCalled();
   });
 });
