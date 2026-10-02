@@ -1475,7 +1475,9 @@ async function getSession(userId, { trace = false } = {}) {
       }
       await pluginEvents.emitAsync('session:creating', { userId: key, contextOptions });
       const context = await b.newContext({ ...contextOptions, serviceWorkers: 'block' });
-      await installPublicNetworkGuard(context);
+      if (String(process.env.CAMOFOX_ALLOW_PRIVATE_NETWORK || '').toLowerCase() !== 'true') {
+        await installPublicNetworkGuard(context);
+      }
 
       let tracePath = null;
       if (trace) {
