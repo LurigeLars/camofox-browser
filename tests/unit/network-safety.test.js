@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest';
+import { jest, describe, expect, test } from '@jest/globals';
 import { installPublicNetworkGuard, publicTargetReason } from '../../lib/network-safety.js';
 
 const publicLookup = async () => [
@@ -52,13 +52,13 @@ describe('network safety', () => {
 
   test('browser context guard aborts a private subrequest', async () => {
     let handler;
-    const context = { route: vi.fn(async (_pattern, fn) => { handler = fn; }) };
+    const context = { route: jest.fn(async (_pattern, fn) => { handler = fn; }) };
     await installPublicNetworkGuard(context, { lookupFn: publicLookup, retryDelayMs: 0 });
 
     const route = {
       request: () => ({ url: () => 'http://[::1]/secret' }),
-      abort: vi.fn(async () => {}),
-      continue: vi.fn(async () => {}),
+      abort: jest.fn(async () => {}),
+      continue: jest.fn(async () => {}),
     };
     await handler(route);
 
@@ -68,13 +68,13 @@ describe('network safety', () => {
 
   test('browser context guard permits a public IPv6 subrequest', async () => {
     let handler;
-    const context = { route: vi.fn(async (_pattern, fn) => { handler = fn; }) };
+    const context = { route: jest.fn(async (_pattern, fn) => { handler = fn; }) };
     await installPublicNetworkGuard(context, { lookupFn: publicLookup, retryDelayMs: 0 });
 
     const route = {
       request: () => ({ url: () => 'https://example.com/data.json' }),
-      abort: vi.fn(async () => {}),
-      continue: vi.fn(async () => {}),
+      abort: jest.fn(async () => {}),
+      continue: jest.fn(async () => {}),
     };
     await handler(route);
 
