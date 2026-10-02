@@ -28,7 +28,7 @@ describe('browser observability', () => {
     expect(value).not.toContain('clear');
     expect(value).not.toContain('user:pass');
     expect(value).not.toContain('#frag');
-    expect(value).toContain('%5BREDACTED%5D');
+    expect(value).toContain('[REDACTED]');
   });
 
   test('sanitizes bearer and JWT-shaped console text', () => {
