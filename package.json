@@ -99,6 +99,14 @@
         "description": "Capture page screenshot"
       },
       {
+        "name": "camofox_network",
+        "description": "Read sanitized recent network events"
+      },
+      {
+        "name": "camofox_console",
+        "description": "Read sanitized recent console and page-error events"
+      },
+      {
         "name": "camofox_close_tab",
         "description": "Close a browser tab"
       },
