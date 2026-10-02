@@ -64,6 +64,12 @@ import {
   isTabLockQueueTimeout, isTabDestroyedError,
   browserErrorStatus, browserErrorCode, browserErrorRecovery, isRetryableBrowserError,
 } from './lib/browser-errors.js';
+import {
+  attachTabObservability,
+  readNetworkEvents,
+  readConsoleEvents,
+  sanitizeObservedUrl,
+} from './lib/browser-observability.js';
 
 const CONFIG = loadConfig();
 
@@ -1875,6 +1881,7 @@ function createTabState(page) {
     lastMainFrameResponse: null,
   };
   page?.on?.('crash', () => { tabState.crashed = true; });
+  attachTabObservability(tabState);
   attachNavigationResponseTracker(tabState);
   return tabState;
 }
@@ -5374,6 +5381,144 @@ app.get('/tabs/:tabId/images', async (req, res) => {
     failuresTotal.labels(classifyError(err), 'images').inc();
     log('error', 'images failed', { reqId: req.reqId, error: err.message });
     res.status(500).json({ error: safeError(err) });
+  }
+});
+
+// Sanitized network observability
+/**
+ * @openapi
+ * /tabs/{tabId}/network:
+ *   get:
+ *     tags: [Content]
+ *     summary: Read sanitized network events
+ *     description: Returns recent request, response, failure, and WebSocket metadata. Headers, cookies, and request/response bodies are never included; credential-like query values are redacted.
+ *     parameters:
+ *       - name: tabId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - name: userId
+ *         in: query
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - name: limit
+ *         in: query
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 200
+ *           default: 100
+ *     responses:
+ *       200:
+ *         description: Sanitized network event list.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *       400:
+ *         description: Missing userId.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Tab not found.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.get('/tabs/:tabId/network', async (req, res) => {
+  try {
+    const userId = req.query.userId;
+    if (!userId) return res.status(400).json({ error: 'userId required' });
+    const session = sessions.get(normalizeUserId(userId));
+    const found = session && findTab(session, req.params.tabId);
+    if (!found) return tabNotFoundResponse(res, req.params.tabId);
+    session.lastAccess = Date.now();
+
+    const { tabState } = found;
+    tabState.toolCalls++;
+    res.json({
+      tabId: req.params.tabId,
+      url: sanitizeObservedUrl(tabState.page.url()),
+      entries: readNetworkEvents(tabState, req.query.limit),
+    });
+  } catch (err) {
+    log('error', 'network observability failed', { reqId: req.reqId, error: err.message });
+    handleRouteError(err, req, res);
+  }
+});
+
+// Sanitized console observability
+/**
+ * @openapi
+ * /tabs/{tabId}/console:
+ *   get:
+ *     tags: [Content]
+ *     summary: Read sanitized console events
+ *     description: Returns recent console and page-error messages with common credential patterns redacted and message lengths bounded.
+ *     parameters:
+ *       - name: tabId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - name: userId
+ *         in: query
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - name: limit
+ *         in: query
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 200
+ *           default: 100
+ *     responses:
+ *       200:
+ *         description: Sanitized console event list.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *       400:
+ *         description: Missing userId.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Tab not found.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.get('/tabs/:tabId/console', async (req, res) => {
+  try {
+    const userId = req.query.userId;
+    if (!userId) return res.status(400).json({ error: 'userId required' });
+    const session = sessions.get(normalizeUserId(userId));
+    const found = session && findTab(session, req.params.tabId);
+    if (!found) return tabNotFoundResponse(res, req.params.tabId);
+    session.lastAccess = Date.now();
+
+    const { tabState } = found;
+    tabState.toolCalls++;
+    res.json({
+      tabId: req.params.tabId,
+      url: sanitizeObservedUrl(tabState.page.url()),
+      entries: readConsoleEvents(tabState, req.query.limit),
+    });
+  } catch (err) {
+    log('error', 'console observability failed', { reqId: req.reqId, error: err.message });
+    handleRouteError(err, req, res);
   }
 });
 

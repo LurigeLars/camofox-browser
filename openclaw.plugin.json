@@ -123,6 +123,8 @@
       "camofox_navigate",
       "camofox_scroll",
       "camofox_screenshot",
+      "camofox_network",
+      "camofox_console",
       "camofox_close_tab",
       "camofox_evaluate",
       "camofox_list_tabs",
