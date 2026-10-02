@@ -47,7 +47,7 @@ export default async function globalSetup() {
   const serverProcess = launchServer({
     pluginDir,
     port: serverPort,
-    env: { ...cfg.serverEnv, CAMOFOX_UPLOADS_DIR: uploadsDir, DEBUG_RESPONSES: 'false', DISPLAY },
+    env: { ...cfg.serverEnv, CAMOFOX_UPLOADS_DIR: uploadsDir, CAMOFOX_ALLOW_PRIVATE_NETWORK: 'true', DEBUG_RESPONSES: 'false', DISPLAY },
     log,
   });
 
