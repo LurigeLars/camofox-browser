@@ -39,6 +39,22 @@ describe('resolveUploadPaths', () => {
       await fs.rm(outside, { recursive: true, force: true });
     }
   });
+  test('rejects absolute paths that only share the upload-directory prefix', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'camofox-uploads-'));
+    const sibling = `${root}-outside`;
+    try {
+      await fs.mkdir(sibling);
+      const siblingFile = path.join(sibling, 'secret.txt');
+      await fs.writeFile(siblingFile, 'secret');
+
+      await expect(resolveUploadPaths({ uploadsDir: root, filePaths: [siblingFile] }))
+        .rejects.toMatchObject({ code: 'upload_path_outside_root' });
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+      await fs.rm(sibling, { recursive: true, force: true });
+    }
+  });
+
   test('rejects empty, relative, and non-regular file paths', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'camofox-uploads-'));
     try {
