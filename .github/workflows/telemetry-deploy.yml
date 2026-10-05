@@ -7,12 +7,16 @@ on:
       - 'workers/crash-reporter/**'
   workflow_dispatch: # manual trigger for initial deploy / redeploy
 
+
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     name: Deploy to Cloudflare Workers
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Inject source verification hashes
         run: |
@@ -22,7 +26,7 @@ jobs:
           sed -i "s/__SOURCE_SHA256__/$HASH/" workers/crash-reporter/index.ts
 
       - name: Deploy
-        uses: cloudflare/wrangler-action@v3.14.0
+        uses: cloudflare/wrangler-action@392082e81ffbcb9ebdde27400634aa004b35ea37 # v3.14.0
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

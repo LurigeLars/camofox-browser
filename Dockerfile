@@ -7,7 +7,9 @@ FROM node:22-trixie-slim AS camofox-browser
 # Pinned Camoufox version for reproducible builds
 # Update these when upgrading Camoufox
 ARG CAMOUFOX_VERSION=152.0.4
-ARG CAMOUFOX_RELEASE=beta.28
+ARG CAMOUFOX_RELEASE=beta.30
+ARG CAMOUFOX_SHA256_AMD64=5720d45b894ce1770543de024c6f10d514b38be560fa2dc3226b3d8586caf672
+ARG CAMOUFOX_SHA256_ARM64=60447260af8bebdb0ec3f2aa72f687b879e5598367303de2e3fdbc7a5be8c124
 ARG TARGETARCH
 ARG YT_DLP_VERSION=2026.08.19
 ARG YT_DLP_SHA256=1fa6733c37ea6fb51c99ad8fe785e7b7e5f3246c9b980230329d4fb72ed8d4d6
@@ -56,12 +58,13 @@ RUN apt-get update && apt-get install -y \
 # points at the archive rather than at the URL that was actually wrong. Note the Linux
 # BuildKit supplies TARGETARCH; map its names to Camoufox release asset names.
 RUN case "${TARGETARCH}" in \
-      amd64) CAMOUFOX_ARCH="x86_64" ;; \
-      arm64) CAMOUFOX_ARCH="arm64" ;; \
+      amd64) CAMOUFOX_ARCH="x86_64"; CAMOUFOX_SHA256="${CAMOUFOX_SHA256_AMD64}" ;; \
+      arm64) CAMOUFOX_ARCH="arm64"; CAMOUFOX_SHA256="${CAMOUFOX_SHA256_ARM64}" ;; \
       *) echo "Unsupported architecture: ${TARGETARCH}" >&2; exit 1 ;; \
     esac \
     && mkdir -p /root/.cache/camoufox \
     && curl -fL -o /tmp/camoufox.zip "https://github.com/daijro/camoufox/releases/download/v${CAMOUFOX_VERSION}-${CAMOUFOX_RELEASE}/camoufox-${CAMOUFOX_VERSION}-${CAMOUFOX_RELEASE}-lin.${CAMOUFOX_ARCH}.zip" \
+    && echo "${CAMOUFOX_SHA256}  /tmp/camoufox.zip" | sha256sum -c - \
     && (unzip -q /tmp/camoufox.zip -d /root/.cache/camoufox || true) \
     && rm /tmp/camoufox.zip \
     && chmod -R 755 /root/.cache/camoufox \
