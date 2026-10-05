@@ -4,7 +4,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { execSync } from './exec.js';
+import { execFileSync } from './exec.js';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -13,7 +13,7 @@ const SCRIPT = path.join(ROOT, 'scripts', 'plugin.js');
 const PLUGINS_DIR = path.join(ROOT, 'plugins');
 const CONFIG_PATH = path.join(ROOT, 'camofox.config.json');
 
-const run = (args) => execSync(`node ${SCRIPT} ${args}`, { cwd: ROOT, encoding: 'utf-8' });
+const run = (args = []) => execFileSync(process.execPath, [SCRIPT, ...args], { cwd: ROOT, encoding: 'utf-8' });
 
 // Save/restore config around tests
 let originalConfig;
@@ -30,7 +30,7 @@ afterEach(() => {
 
 describe('plugin list', () => {
   test('lists youtube as enabled', () => {
-    const out = run('list');
+    const out = run(['list']);
     expect(out).toContain('youtube');
     expect(out).toContain('[ok]');
   });
@@ -52,7 +52,7 @@ describe('plugin install (local)', () => {
   });
 
   test('copies plugin dir and updates config', () => {
-    const out = run(`install ${tmpDir}`);
+    const out = run(['install', tmpDir]);
     expect(out).toContain('Installed');
 
     // Plugin dir exists
@@ -70,8 +70,8 @@ describe('plugin install (local)', () => {
   });
 
   test('rejects duplicate install', () => {
-    run(`install ${tmpDir}`);
-    expect(() => run(`install ${tmpDir}`)).toThrow();
+    run(['install', tmpDir]);
+    expect(() => run(['install', tmpDir])).toThrow();
   });
 });
 
@@ -82,7 +82,7 @@ describe('plugin remove', () => {
     fs.mkdirSync(tmpDir, { recursive: true });
     fs.writeFileSync(path.join(tmpDir, 'index.js'),
       'export function register(app, ctx) {}');
-    run(`install ${tmpDir}`);
+    run(['install', tmpDir]);
   });
 
   afterEach(() => {
@@ -92,7 +92,7 @@ describe('plugin remove', () => {
   });
 
   test('removes plugin dir and config entry', () => {
-    const out = run('remove .tmp-test-plugin-rm');
+    const out = run(['remove', '.tmp-test-plugin-rm']);
     expect(out).toContain('Removed');
 
     const installed = path.join(PLUGINS_DIR, '.tmp-test-plugin-rm');
@@ -107,13 +107,13 @@ describe('plugin remove', () => {
   });
 
   test('errors on unknown plugin', () => {
-    expect(() => run('remove nonexistent-plugin-xyz')).toThrow();
+    expect(() => run(['remove', 'nonexistent-plugin-xyz'])).toThrow();
   });
 });
 
 describe('plugin help', () => {
   test('shows usage with no args', () => {
-    const out = run('');
+    const out = run();
     expect(out).toContain('Usage');
     expect(out).toContain('install');
     expect(out).toContain('remove');
