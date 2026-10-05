@@ -37,7 +37,7 @@ describe('profile persistence helpers', () => {
     await expect(loadPersistedStorageState(tmpDir, 'user-1')).resolves.toBeUndefined();
   });
 
-  test('persistStorageState writes storage state and metadata, then load returns the storage path', async () => {
+  test('persistStorageState writes only storage state, then load returns the storage path', async () => {
     const storageState = {
       cookies: [{ name: 'session', value: 'abc', domain: '.example.com', path: '/' }],
       origins: [{ origin: 'https://app.example.com', localStorage: [{ name: 'foo', value: 'bar' }] }],
@@ -62,9 +62,8 @@ describe('profile persistence helpers', () => {
     const loadedPath = await loadPersistedStorageState(tmpDir, 'user-1');
     expect(loadedPath).toBe(result.storageStatePath);
 
-    const meta = JSON.parse(await fs.readFile(result.metaPath, 'utf8'));
-    expect(meta.userId).toBe('user-1');
-    expect(meta.storageStatePath).toBe(result.storageStatePath);
+    const { metaPath } = getUserPersistencePaths(tmpDir, 'user-1');
+    await expect(fs.access(metaPath)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   test('loadPersistedStorageState ignores invalid JSON files', async () => {
