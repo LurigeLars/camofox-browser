@@ -103,7 +103,7 @@ npm install
 npm start  # downloads Camoufox on first run (~300MB)
 ```
 
-Default port is `9377`. See [Environment Variables](#environment-variables) for all options.
+Default port is `9377` and the server binds to `127.0.0.1`. Set `CAMOFOX_BIND_HOST=0.0.0.0` only for an explicitly remote/container deployment; non-loopback binds require `CAMOFOX_ACCESS_KEY`. See [Environment Variables](#environment-variables) for all options.
 
 > **Note:** the postinstall script unsets `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD` for itself before fetching the Camoufox binary. Without that override, an exported `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` (common when Playwright is configured to use system Chrome) would silently skip the binary download and crash the server at runtime.
 >
@@ -184,6 +184,8 @@ railway up
 
 Set secrets via the Railway dashboard or CLI:
 ```bash
+railway variables set CAMOFOX_BIND_HOST="0.0.0.0"
+railway variables set CAMOFOX_ACCESS_KEY="your-generated-access-key"
 railway variables set CAMOFOX_API_KEY="your-generated-key"
 ```
 
@@ -328,6 +330,8 @@ curl -X POST http://localhost:9377/sessions/agent1/cookies \
 
 ```bash
 docker run -p 9377:9377 \
+  -e CAMOFOX_BIND_HOST=0.0.0.0 \
+  -e CAMOFOX_ACCESS_KEY="your-generated-access-key" \
   -e CAMOFOX_API_KEY="your-generated-key" \
   -v ~/.camofox/cookies:/home/node/.camofox/cookies:ro \
   camofox-browser
@@ -335,6 +339,7 @@ docker run -p 9377:9377 \
 
 For Fly.io:
 ```bash
+fly secrets set CAMOFOX_ACCESS_KEY="your-generated-access-key"
 fly secrets set CAMOFOX_API_KEY="your-generated-key"
 ```
 
@@ -634,7 +639,7 @@ Browser behavior can be tuned in `camofox.config.json`:
 |----------|-------------|---------|
 | `CAMOFOX_PORT` | Server port | `9377` |
 | `PORT` | Server port (fallback, for platforms like Fly.io, Railway) | `9377` |
-| `CAMOFOX_BIND_HOST` | Optional server bind host. Set to `127.0.0.1` for loopback-only access or `0.0.0.0` for IPv4 on all interfaces. When unset, Node uses its default all-interface binding. | - |
+| `CAMOFOX_BIND_HOST` | Server bind host. Defaults to loopback. Non-loopback binds such as `0.0.0.0` require `CAMOFOX_ACCESS_KEY`. | `127.0.0.1` |
 | `CAMOFOX_API_KEY` | Enable cookie import endpoint (disabled if unset) | - |
 | `CAMOFOX_ADMIN_KEY` | Required for `POST /stop` | - |
 | `CAMOFOX_ACCESS_KEY` | If set, all routes (except `/health`, cookie import, and `/stop`) require `Authorization: Bearer <key>`. Lets you safely expose the server beyond loopback. | - |
