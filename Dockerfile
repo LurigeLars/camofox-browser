@@ -2,7 +2,7 @@
 # linked against GLIBC_2.38, so on bookworm it loads and then dies at runtime with
 # "version `GLIBC_2.38' not found" the first time a tab is opened. amd64 is
 # unaffected because that prebuild targets an older glibc.
-FROM node:22-trixie-slim AS camofox-browser
+FROM node:26-trixie-slim AS camofox-browser
 
 # Pinned Camoufox version for reproducible builds
 # Update these when upgrading Camoufox
