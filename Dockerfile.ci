@@ -1,10 +1,12 @@
 # CI/CD Dockerfile — downloads binaries during build (no bind mounts needed).
 # For local builds with pre-downloaded binaries, use the default Dockerfile + Makefile.
 
-FROM node:22-trixie-slim
+FROM node:26-trixie-slim
 
 ARG CAMOUFOX_VERSION=152.0.4
-ARG CAMOUFOX_RELEASE=beta.28
+ARG CAMOUFOX_RELEASE=beta.30
+ARG CAMOUFOX_SHA256_AMD64=5720d45b894ce1770543de024c6f10d514b38be560fa2dc3226b3d8586caf672
+ARG CAMOUFOX_SHA256_ARM64=60447260af8bebdb0ec3f2aa72f687b879e5598367303de2e3fdbc7a5be8c124
 ARG TARGETARCH
 ARG YT_DLP_VERSION=2026.08.19
 ARG YT_DLP_SHA256_AMD64=58162f9bfdc27458ea47bfcb311cf47028f17d8154a8bf7d689861d46399230a
@@ -50,13 +52,14 @@ RUN apt-get update && apt-get install -y \
 # Download and install Camoufox
 RUN set -eux; \
     case "${TARGETARCH}" in \
-      amd64) CAMOUFOX_ARCH="x86_64" ;; \
-      arm64) CAMOUFOX_ARCH="arm64" ;; \
+      amd64) CAMOUFOX_ARCH="x86_64"; CAMOUFOX_SHA256="${CAMOUFOX_SHA256_AMD64}" ;; \
+      arm64) CAMOUFOX_ARCH="arm64"; CAMOUFOX_SHA256="${CAMOUFOX_SHA256_ARM64}" ;; \
       *) echo "Unsupported arch: ${TARGETARCH}" && exit 1 ;; \
     esac; \
     mkdir -p /root/.cache/camoufox; \
     curl -fSL "https://github.com/daijro/camoufox/releases/download/v${CAMOUFOX_VERSION}-${CAMOUFOX_RELEASE}/camoufox-${CAMOUFOX_VERSION}-${CAMOUFOX_RELEASE}-lin.${CAMOUFOX_ARCH}.zip" \
       -o /tmp/camoufox.zip; \
+    echo "${CAMOUFOX_SHA256}  /tmp/camoufox.zip" | sha256sum -c -; \
     (unzip -q /tmp/camoufox.zip -d /root/.cache/camoufox || true); \
     chmod -R 755 /root/.cache/camoufox; \
     echo "{\"version\":\"${CAMOUFOX_VERSION}\",\"release\":\"${CAMOUFOX_RELEASE}\"}" > /root/.cache/camoufox/version.json; \
