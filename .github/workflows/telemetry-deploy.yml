@@ -8,6 +8,10 @@ on:
   workflow_dispatch: # manual trigger for initial deploy / redeploy
 
 
+concurrency:
+  group: telemetry-deploy
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
