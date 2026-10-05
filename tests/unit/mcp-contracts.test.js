@@ -88,8 +88,8 @@ afterEach(() => {
 
 // --- Schema sanity ----------------------------------------------------------
 describe('TOOL_DEFS', () => {
-  test('exposes exactly 11 tools', () => {
-    expect(TOOL_DEFS).toHaveLength(11);
+  test('exposes exactly 13 tools', () => {
+    expect(TOOL_DEFS).toHaveLength(13);
   });
 
   test('every def has a unique name and a valid JSON-Schema object', () => {
@@ -113,6 +113,9 @@ describe('buildRequest', () => {
     ['camofox_navigate', { tabId: 't1', url: 'https://y.com' }, { method: 'POST', path: '/tabs/t1/navigate', auth: 'accessKey', kind: 'json' }],
     ['camofox_scroll', { tabId: 't1', direction: 'down', amount: 200 }, { method: 'POST', path: '/tabs/t1/scroll', auth: 'accessKey', kind: 'json' }],
     ['camofox_screenshot', { tabId: 't1' }, { method: 'GET', path: '/tabs/t1/screenshot?userId=u1', auth: 'accessKey', kind: 'image' }],
+    ['camofox_network', { tabId: 't1' }, { method: 'GET', path: '/tabs/t1/network?userId=u1', auth: 'accessKey', kind: 'json' }],
+    ['camofox_network', { tabId: 't1', limit: 25 }, { method: 'GET', path: '/tabs/t1/network?userId=u1&limit=25', auth: 'accessKey', kind: 'json' }],
+    ['camofox_console', { tabId: 't1', limit: 10 }, { method: 'GET', path: '/tabs/t1/console?userId=u1&limit=10', auth: 'accessKey', kind: 'json' }],
     ['camofox_close_tab', { tabId: 't1' }, { method: 'DELETE', path: '/tabs/t1?userId=u1', auth: 'accessKey', kind: 'json' }],
     ['camofox_evaluate', { tabId: 't1', expression: '1+1' }, { method: 'POST', path: '/tabs/t1/evaluate', auth: 'accessKey', kind: 'json' }],
     ['camofox_list_tabs', {}, { method: 'GET', path: '/tabs?userId=u1', auth: 'accessKey', kind: 'json' }],

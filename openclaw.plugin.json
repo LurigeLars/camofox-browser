@@ -2,7 +2,7 @@
   "id": "camofox-browser",
   "name": "Camofox Browser",
   "description": "Anti-detection browser automation for AI agents using Camoufox (Firefox-based)",
-  "version": "1.17.0",
+  "version": "1.18.1",
   "configSchema": {
     "type": "object",
     "properties": {
@@ -123,6 +123,8 @@
       "camofox_navigate",
       "camofox_scroll",
       "camofox_screenshot",
+      "camofox_network",
+      "camofox_console",
       "camofox_close_tab",
       "camofox_evaluate",
       "camofox_list_tabs",

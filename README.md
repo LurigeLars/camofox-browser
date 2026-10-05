@@ -65,6 +65,7 @@ This project wraps that engine in a REST API built for agents: accessibility sna
 - **OpenAPI Docs** - auto-generated spec at [`/openapi.json`](http://localhost:9377/openapi.json) and interactive docs at [`/docs`](http://localhost:9377/docs)
 - **Structured Extract** - `POST /tabs/:tabId/extract` with a JSON Schema that maps properties to snapshot refs via `x-ref`
 - **Session Tracing** - opt-in per-session Playwright trace capture (screenshots + DOM snapshots + network) with API endpoints to list, fetch, and delete trace zips
+- **Live Observability** - bounded, sanitized per-tab network and console streams for debugging without exposing headers, cookies, request/response bodies, or credential-like query values
 - **Telemetry** - automatic [anonymized crash/hang telemetry](lib/reporter.js#L28-L290) via GitHub Issues. Identifies which sites cause failures and common failure patterns. Private domains are HMAC-hashed, paths/params stripped, tokens/IPs redacted. Opt-out with `CAMOFOX_CRASH_REPORT_ENABLED=false`.
 
 ## Optional Dependencies
@@ -83,7 +84,7 @@ The Docker image includes yt-dlp. For local dev, install it for the `/youtube/tr
 openclaw plugins install @askjo/camofox-browser
 ```
 
-**Tools:** `camofox_create_tab`  |  `camofox_snapshot`  |  `camofox_click`  |  `camofox_type`  |  `camofox_navigate`  |  `camofox_scroll`  |  `camofox_screenshot`  |  `camofox_close_tab`  |  `camofox_list_tabs`  |  `camofox_import_cookies`
+**Tools:** `camofox_create_tab`  |  `camofox_snapshot`  |  `camofox_click`  |  `camofox_type`  |  `camofox_navigate`  |  `camofox_scroll`  |  `camofox_screenshot`  |  `camofox_network`  |  `camofox_console`  |  `camofox_close_tab`  |  `camofox_list_tabs`  |  `camofox_import_cookies`
 
 ### Standalone
 
@@ -681,6 +682,8 @@ Browser behavior can be tuned in `camofox.config.json`:
 | `CAMOFOX_CRASH_REPORT_RATE_LIMIT` | Max telemetry reports per hour | `10` |
 | `ENABLE_VNC` | Enable VNC plugin for interactive browser access (`1`) | - |
 | `VNC_PASSWORD` | Password for VNC access (recommended in production) | - |
+| `VNC_BIND` | noVNC listen address; set `0.0.0.0` to reach noVNC through a published container port | `127.0.0.1` |
+| `VNC_RFB_BIND` | Native VNC listen address; non-loopback requires `VNC_PASSWORD` and does not change with `VNC_BIND` | `127.0.0.1` |
 | `NOVNC_PORT` | noVNC web UI port | `6080` |
 
 ## Interactive desktop browser

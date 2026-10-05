@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "camofox-browser",
-    "version": "1.17.0",
+    "version": "1.18.1",
     "description": "Anti-detection browser automation server for AI agents. Accessibility snapshots, element refs, session isolation, cookie import, proxy rotation, and structured logs.",
     "license": {
       "name": "MIT",
@@ -3093,6 +3093,146 @@
           },
           "400": {
             "description": "Bad request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tab not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tabs/{tabId}/network": {
+      "get": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "Read sanitized network events",
+        "description": "Returns recent request, response, failure, and WebSocket metadata. Headers, cookies, and request/response bodies are never included; credential-like query values are redacted.",
+        "parameters": [
+          {
+            "name": "tabId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sanitized network event list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing userId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tab not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tabs/{tabId}/console": {
+      "get": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "Read sanitized console events",
+        "description": "Returns recent console and page-error messages with common credential patterns redacted and message lengths bounded.",
+        "parameters": [
+          {
+            "name": "tabId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sanitized console event list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing userId.",
             "content": {
               "application/json": {
                 "schema": {
