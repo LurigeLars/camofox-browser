@@ -109,6 +109,12 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps firefox
 
+      - name: Install Camoufox
+        run: npm run fetch-bin
+        env:
+          # camoufox-js uses this for authenticated GitHub release lookups.
+          GITHUB_TOKEN: ${{ github.token }}
+
       - name: Install browser system deps (cache hit)
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps firefox
