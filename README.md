@@ -1,3 +1,105 @@
+# camofox-browser — maintained fork
+
+[![CI](https://github.com/LurigeLars/camofox-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/LurigeLars/camofox-browser/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/LurigeLars/camofox-browser/actions/workflows/codeql.yml/badge.svg)](https://github.com/LurigeLars/camofox-browser/actions/workflows/codeql.yml)
+![Node.js](https://img.shields.io/badge/node-22%2B-green)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+This repository is a maintained fork of
+[jo-inc/camofox-browser](https://github.com/jo-inc/camofox-browser), an agent-oriented
+browser automation server built on Camoufox.
+
+The fork is kept because it is a runtime dependency of the local
+**InfluencerResearch** stack and occasionally needs security, reliability or integration
+fixes on a different schedule from upstream.
+
+## Why this fork exists
+
+The goal is not to create a separate browser product. The preferred path is still to
+consume upstream improvements and contribute generally useful fixes back when possible.
+
+This fork provides a controlled place to:
+
+- pin the exact browser/server code used by InfluencerResearch;
+- carry reviewed security and privacy hardening while upstream review is pending;
+- test dependency updates against our runtime before adopting them;
+- keep CI, CodeQL and browser/process regression coverage active for the deployed version;
+- patch browser/session behavior when a production research workflow exposes a concrete
+  issue.
+
+The fork has diverged from upstream because some hardening and maintenance changes have
+landed locally first. Upstream changes should still be reviewed regularly rather than
+allowing the fork to become an unrelated implementation.
+
+## How it is used in our stack
+
+```text
+InfluencerResearch
+      |
+      v
+internal Camofox service
+      |
+      v
+this camofox-browser fork
+      |
+      v
+Camoufox browser engine
+      |
+      v
+public web pages used by approved research workflows
+```
+
+In the maintained InfluencerResearch deployment, Camofox is an **internal browser
+service**. It is not exposed as the public research MCP surface. InfluencerResearch owns
+creator identity, coverage, ingestion and evidence semantics; this repository owns the
+browser execution layer.
+
+## Security boundary
+
+Camofox is powerful browser automation software. Treat its HTTP API as a privileged
+local/internal service.
+
+- Keep the service loopback-only or on a private container network unless you have an
+  explicit authenticated deployment.
+- Non-loopback use should require `CAMOFOX_ACCESS_KEY`.
+- Cookie import is a separate privileged capability and remains disabled unless its key
+  is explicitly configured.
+- Persistent browser profiles can contain authenticated session material; do not commit
+  or expose them.
+- Browser content is untrusted input.
+- Telemetry can be disabled with `CAMOFOX_CRASH_REPORT_ENABLED=false`; the
+  InfluencerResearch runtime disables it.
+- Do not expose the browser merely because a higher-level application needs one narrow
+  research workflow.
+
+## Using this fork vs the upstream npm package
+
+The npm package name `@askjo/camofox-browser` belongs to the upstream project.
+
+Therefore:
+
+- cloning `https://github.com/LurigeLars/camofox-browser` uses this fork;
+- `npm install @askjo/camofox-browser` or `npx @askjo/camofox-browser` installs the
+  upstream published package unless upstream has published the same changes;
+- upstream links, branding, npm commands and credits in the documentation below remain
+  intentionally preserved.
+
+For fork-specific testing from source:
+
+```bash
+git clone https://github.com/LurigeLars/camofox-browser.git
+cd camofox-browser
+npm install
+npm test
+```
+
+## Upstream project documentation
+
+The remainder of this README is retained from the upstream project so its usage,
+configuration, API, credits and licensing remain discoverable and correctly attributed.
+
+---
+
 <div align="center">
   <img src="fox.png" alt="camofox-browser" width="200" />
   <h1>camofox-browser</h1>
