@@ -14,6 +14,8 @@ updates:
         applies-to: version-updates
         patterns:
           - "*"
+        exclude-patterns:
+          - "camoufox-js"
         update-types:
           - "minor"
           - "patch"
