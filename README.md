@@ -20,10 +20,10 @@ consume upstream improvements and contribute generally useful fixes back when po
 
 This fork provides a controlled place to:
 
-- pin the exact browser/server code used by InfluencerResearch;
-- carry reviewed security and privacy hardening while upstream review is pending;
-- test dependency updates against our runtime before adopting them;
-- keep CI, CodeQL and browser/process regression coverage active for the deployed version;
+- pin the exact browser/server code used by InfluencerResearch.
+- carry reviewed security and privacy hardening while upstream review is pending.
+- test dependency updates against our runtime before adopting them.
+- keep CI, CodeQL and browser/process regression coverage active for the deployed version.
 - patch browser/session behavior when a production research workflow exposes a concrete
   issue.
 
@@ -78,7 +78,7 @@ The npm package name `@askjo/camofox-browser` belongs to the upstream project.
 
 Therefore:
 
-- cloning `https://github.com/LurigeLars/camofox-browser` uses this fork;
+- cloning `https://github.com/LurigeLars/camofox-browser` uses this fork.
 - `npm install @askjo/camofox-browser` or `npx @askjo/camofox-browser` installs the
   upstream published package unless upstream has published the same changes;
 - upstream links, branding, npm commands and credits in the documentation below remain
