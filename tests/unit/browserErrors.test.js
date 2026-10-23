@@ -59,6 +59,13 @@ describe('browser error normalization', () => {
     expect(browserErrorRecovery(err)).toBe('snapshot_then_retry');
   });
 
+  test('Playwright superseded navigations normalize to retryable navigation races', () => {
+    const err = new Error('page.goto: Navigation to "https://first.example" is interrupted by another navigation to "https://second.example"');
+    expect(browserErrorStatus(err)).toBe(409);
+    expect(browserErrorCode(err)).toBe('navigation_race');
+    expect(browserErrorRecovery(err)).toBe('snapshot_then_retry');
+  });
+
   test('Firefox interrupted navigations normalize to retryable navigation races', () => {
     for (const message of ['page.goto: NS_ERROR_NET_INTERRUPT', 'page.reload: NS_BINDING_ABORTED']) {
       const err = new Error(message);

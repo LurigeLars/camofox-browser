@@ -595,20 +595,30 @@ function getTabLock(tabId) {
 }
 
 // Timeout is INSIDE the lock so each operation gets its full budget
-// regardless of how long it waited in the queue.
+// regardless of how long it waited in the queue. When an operation times out we
+// keep its lock held until the underlying promise actually settles, so later
+// queued work cannot overlap with a still-running (zombie) Playwright operation
+// and corrupt CDP state.
 async function withTabLock(tabId, operation, timeoutMs = HANDLER_TIMEOUT_MS, onTimeout) {
   const lock = getTabLock(tabId);
   await lock.acquire(TAB_LOCK_TIMEOUT_MS);
+  const operationPromise = Promise.resolve().then(operation);
+  let releaseOnSettlement = false;
   try {
-    return await withTimeout(operation(), timeoutMs, 'action');
+    return await withTimeout(operationPromise, timeoutMs, 'action');
   } catch (err) {
+    if (isTimeoutError(err)) {
+      // Do not release until the real operation finishes; let it drain the lock.
+      releaseOnSettlement = true;
+      operationPromise.finally(() => lock.release()).catch(() => {});
+    }
     if (onTimeout && isTimeoutError(err)) {
       await onTimeout();
       throw Object.assign(err, { code: 'tab_timeout', statusCode: 410 });
     }
     throw err;
   } finally {
-    lock.release();
+    if (!releaseOnSettlement) lock.release();
   }
 }
 
