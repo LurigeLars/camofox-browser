@@ -931,33 +931,6 @@ function getExternalCamoufoxLaunch() {
   return externalCamoufoxLaunch;
 }
 
-async function probeGoogleSearch(candidateBrowser) {
-  let context = null;
-  try {
-    context = await candidateBrowser.newContext({
-      viewport: null,
-      ...contextIdentityOptions({
-        hasProxy: !!proxyPool,
-        directIdentity: CONFIG.directIdentity,
-      }),
-    });
-    const page = await context.newPage();
-    await page.goto('https://www.google.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForTimeout(1200);
-    await page.goto('https://www.google.com/search?q=weather%20today', { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForTimeout(4000);
-
-    const blocked = await isGoogleSearchBlocked(page);
-    return {
-      ok: !blocked && isGoogleSerp(page.url()),
-      url: page.url(),
-      blocked,
-    };
-  } finally {
-    await context?.close().catch(() => {});
-  }
-}
-
 function attachBrowserCleanup(candidateBrowser, localVirtualDisplay) {
   const origClose = candidateBrowser.close.bind(candidateBrowser);
   candidateBrowser.close = async (...args) => {
@@ -1225,29 +1198,10 @@ async function launchBrowserInstance() {
 
       candidateBrowser = await firefox.launch(options);
 
-      if (proxyPool?.canRotateSessions) {
-        const probe = await probeGoogleSearch(candidateBrowser);
-        if (!probe.ok) {
-          log('warn', 'browser launch google probe failed', {
-            attempt,
-            maxAttempts,
-            proxySession: launchProxy?.sessionId || null,
-            url: probe.url,
-          });
-          if (attempt < maxAttempts) {
-            await candidateBrowser.close().catch(() => {});
-            if (localVirtualDisplay) localVirtualDisplay.kill();
-            continue;
-          }
-          // Last attempt: accept browser in degraded mode rather than death-spiraling.
-          // Non-Google sites will still work; Google requests will get blocked responses.
-          log('error', 'all proxy sessions Google-blocked, accepting browser in degraded mode', {
-            maxAttempts,
-            proxySession: launchProxy?.sessionId || null,
-          });
-        }
-      }
-
+      // Browser startup must remain site-agnostic. Google-specific blocking is
+      // handled by the Google navigation/snapshot rotation paths below; gating
+      // every cold start on a Google probe makes unrelated sites unavailable
+      // whenever the proxy provider's current Google reputation is poor.
       virtualDisplay = localVirtualDisplay;
       browserLaunchProxy = launchProxy;
       _lastBrowserPid = candidateBrowser.process?.()?.pid ?? null;
