@@ -17,12 +17,12 @@ describe('Docker Camoufox release pin', () => {
 });
 
 describe('Playwright protocol compatibility', () => {
-  test('retains compatible Playwright 1.62.1 instead of resolving 1.64+', () => {
+  test('verifies tested Playwright 1.63.0 below unsupported 1.64+', () => {
     const manifest = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
     const lock = JSON.parse(readFileSync(path.join(root, 'package-lock.json'), 'utf8'));
     expect(manifest.dependencies['camoufox-js']).toBe('0.11.5');
-    expect(manifest.dependencies['playwright-core']).toBe('1.62.1');
-    expect(lock.packages[''].dependencies['playwright-core']).toBe('1.62.1');
-    expect(lock.packages['node_modules/playwright-core'].version).toBe('1.62.1');
+    expect(manifest.dependencies['playwright-core']).toBe('1.63.0');
+    expect(lock.packages[''].dependencies['playwright-core']).toBe('1.63.0');
+    expect(lock.packages['node_modules/playwright-core'].version).toBe('1.63.0');
   });
 });
