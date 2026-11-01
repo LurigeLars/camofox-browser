@@ -51,8 +51,11 @@ jobs:
         shell: bash
         run: |
           set -uo pipefail
-          xvfb-run --auto-servernum node scripts/compat/beta41_playwright164_smoke.mjs > "$RUNNER_TEMP/unpatched.log" 2>&1
-          status=$?
+          if xvfb-run --auto-servernum node scripts/compat/beta41_playwright164_smoke.mjs > "$RUNNER_TEMP/unpatched.log" 2>&1; then
+            status=0
+          else
+            status=$?
+          fi
           cat "$RUNNER_TEMP/unpatched.log"
           if [[ "$status" -eq 0 ]]; then
             echo "::error::Unpatched release unexpectedly supports 1.64; investigate before applying patches"
