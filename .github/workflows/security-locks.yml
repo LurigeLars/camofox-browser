@@ -64,4 +64,19 @@ jobs:
               : manifest.overrides[name], version, `${name} override`);
           }
           assert.equal(lock.packages['node_modules/body-parser/node_modules/content-type']?.version, '2.1.0');
+          if (manifest.name === '@askjo/camofox-browser') {
+            const securePatterns = { glob: '14.0.2', minimatch: '11.0.1', 'path-scurry': '3.0.0' };
+            for (const [name, version] of Object.entries(securePatterns)) {
+              assert.equal(manifest.overrides[name], version, `${name} override`);
+              const paths = Object.entries(lock.packages).filter(([path]) =>
+                path.endsWith('node_modules/' + name)
+              );
+              assert.ok(paths.length > 0, `${name} must be present`);
+              for (const [path, entry] of paths) {
+                assert.equal(entry.version, version, `${name} at ${path}`);
+                assert.match(entry.integrity ?? '', /^sha512-/, `${name} integrity at ${path}`);
+              }
+            }
+          }
+
           NODE
