@@ -724,10 +724,10 @@ let _lastBrowserStopReason = null;
 const INTENTIONAL_STOP_REASONS = new Set(['idle_shutdown', 'admin_stop']);
 
 function scheduleBrowserIdleShutdown() {
-  if (browserIdleTimer || sessions.size > 0 || !browser || BROWSER_IDLE_TIMEOUT_MS <= 0) return;
+  if (browserIdleTimer || sessions.size > 0 || activeSessionClosures > 0 || !browser || BROWSER_IDLE_TIMEOUT_MS <= 0) return;
   browserIdleTimer = setTimeout(async () => {
     browserIdleTimer = null;
-    if (sessions.size === 0 && browser) {
+    if (sessions.size === 0 && activeSessionClosures === 0 && browser) {
       log('info', 'browser idle shutdown (no sessions)');
       await closeBrowserFully('idle_shutdown');
     }
