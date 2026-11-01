@@ -47,6 +47,8 @@ jobs:
           const manifest = JSON.parse(fs.readFileSync('package.json', 'utf8'));
           const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
           const fixes = {
+            '@hono/node-server': '2.1.3',
+            'zod': '4.6.6',
             'body-parser': '2.4.0',
             'fast-uri': '3.1.9',
             'hono': '4.13.13',
