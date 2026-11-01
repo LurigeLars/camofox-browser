@@ -39,6 +39,32 @@ jobs:
           cache-dependency-path: ${{ matrix.directory }}/package-lock.json
       - name: Reproducible, no-postinstall dependency install
         run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Verify dev-only deepmerge compatibility and prototype safety
+        if: matrix.directory == '.'
+        run: |
+          node <<'NODE'
+          const assert = require('node:assert/strict');
+          const fs = require('node:fs');
+          const m = require('deepmerge');
+          const manifest = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          assert.equal(manifest.overrides.deepmerge, 'npm:@stackline/deepmerge@1.1.0');
+          assert.equal(lock.packages['node_modules/deepmerge'].name, '@stackline/deepmerge');
+          assert.equal(lock.packages['node_modules/deepmerge'].version, '1.1.0');
+          assert.equal(lock.packages['node_modules/deepmerge'].dev, true, 'replacement is dev-only');
+          assert.equal(lock.packages['node_modules/deepmerge'].hasInstallScript, undefined, 'no install hook');
+          assert.match(lock.packages['node_modules/deepmerge'].integrity, /^sha512-/, 'registry integrity pinned');
+          assert.equal(require('deepmerge/package.json').name, '@stackline/deepmerge', 'installed alias identity');
+          assert.equal(typeof m, 'function', 'Jest expects CommonJS callable deepmerge');
+          assert.deepEqual(m({ test: { a: 1 }, arr: [1] }, { test: { b: 2 }, arr: [2] }),
+            { test: { a: 1, b: 2 }, arr: [1, 2] });
+          const result = m({}, JSON.parse('{"__proto__":{"compromised":true},"valid":1}'));
+          assert.equal(Object.getPrototypeOf(result), Object.prototype, 'reject attacker-defined prototype');
+          assert.equal(Object.hasOwn(result, '__proto__'), false, 'reject unsafe source property');
+          assert.equal(result.compromised, undefined);
+          assert.equal(result.valid, 1);
+          NODE
       - name: Verify patched dependency floor and lockfile integrity
         run: |
           node <<'NODE'
