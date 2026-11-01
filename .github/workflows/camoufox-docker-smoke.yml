@@ -32,18 +32,28 @@ jobs:
           docker run --rm --platform linux/amd64 --entrypoint node camofox-compat-smoke \
             --input-type=module -e '
               import fs from "node:fs";
+              import { createHash } from "node:crypto";
               import { firefox } from "playwright-core";
               import { launchOptions } from "camoufox-js";
               const v = JSON.parse(fs.readFileSync("/root/.cache/camoufox/version.json", "utf8"));
               const expectedRelease = fs.readFileSync("/app/lib/camoufox-download.js", "utf8").match(/BUNDLED_CAMOUFOX_RELEASE\s*=\s*[\x27"]([^\x27"]+)[\x27"]/)[1];
               if (`${v.version}-${v.release}` !== expectedRelease) throw new Error("Unexpected baked browser release");
               if (!fs.existsSync("/root/.cache/camoufox/camoufox-bin")) throw new Error("Missing browser binary");
+              const patchedSha = createHash("sha256").update(fs.readFileSync("/root/.cache/camoufox/omni.ja")).digest("hex");
+              if (patchedSha !== "2bad253389292f3009f669401eb8bc3abd615fb7c4e7d9619865f6c75b5c50fa") {
+                throw new Error("Patched runtime browser SHA256 mismatch");
+              }
               const browser = await firefox.launch(await launchOptions({ headless: true }));
               try {
                 const page = await browser.newPage();
                 await page.goto("about:blank");
                 if (!(await page.evaluate(() => document.readyState === "complete"))) throw new Error("Browser failed to navigate");
-                console.log("Camoufox Docker smoke passed:", expectedRelease);
+                await page.route("**/protocol-probe", (route) => route.fulfill({ status: 200, body: "juggler-ok" }));
+                await page.goto("http://example.test/protocol-probe");
+                if ((await page.locator("body").textContent()) !== "juggler-ok") throw new Error("Playwright 1.64 request interception failed");
+                const state = await page.context().storageState();
+                if (!Array.isArray(state.cookies) || !Array.isArray(state.origins)) throw new Error("Storage-state capture failed");
+                console.log("Camoufox Docker smoke passed: release, digest, route, storageState", expectedRelease);
               } finally {
                 await browser.close();
               }
