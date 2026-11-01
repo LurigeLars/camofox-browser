@@ -509,6 +509,9 @@ let _lastBrowserRestartAt = 0; // Timestamp of last browser relaunch (for stale 
 // TabState = { page, refs: Map<refId, {role, name, nth}>, visitedUrls: Set, downloads: Array, toolCalls: number }
 // Note: sessionKey was previously called listItemId - both are accepted for backward compatibility
 const sessions = new Map();
+// Sessions leave admission accounting before async persistence/teardown completes.
+// Keep idle RSS restarts away from in-flight storage-state saves.
+let activeSessionClosures = 0;
 
 const SESSION_TIMEOUT_MS = CONFIG.sessionTimeoutMs;
 const MAX_SNAPSHOT_NODES = 500;
@@ -1317,7 +1320,17 @@ function clearSessionLocks(session) {
   refreshTabLockQueueDepth();
 }
 
-async function closeSession(userId, session, {
+async function closeSession(userId, session, options = {}) {
+  if (!session) return;
+  activeSessionClosures++;
+  try {
+    return await closeSessionImpl(userId, session, options);
+  } finally {
+    activeSessionClosures--;
+  }
+}
+
+async function closeSessionImpl(userId, session, {
   reason = 'session_closed',
   clearDownloads = true,
   clearLocks = true,
@@ -6436,7 +6449,9 @@ setInterval(() => {
 // is large. This prevents idle Firefox children from holding most of the VM RAM
 // while Node reports zero sessions/tabs.
 setInterval(() => {
-  if (sessions.size > 0 || !browser) return;
+  // closeSession removes the entry from sessions before awaiting persistence.
+  // Never kill that browser while its detached context is still saving.
+  if (sessions.size > 0 || activeSessionClosures > 0 || !browser) return;
   const mem = process.memoryUsage();
   const nativeMemMb = Math.round((mem.rss - mem.heapUsed) / 1048576);
   const browserRssMb = browserProcessTreeRssMb(_browserPid()) ?? browserProcessNameRssMb();
