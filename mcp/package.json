@@ -43,8 +43,8 @@
   "overrides": {
     "fast-uri": "3.1.9",
     "hono": "4.13.13",
-    "qs": "6.16.0",
-    "ip-address": "10.7.2",
+    "qs": "6.17.1",
+    "ip-address": "10.7.5",
     "proxy-addr": "2.0.8"
   }
 }
