@@ -149,6 +149,33 @@ describe('Tab Lifecycle Contract', () => {
       }
     }, 60000);
 
+    test('real Playwright click on target=_blank link creates a managed tab', async () => {
+      const client = createClient(serverUrl);
+      try {
+        const { tabId } = await client.createTab(`${testSiteUrl}/popup-source`);
+
+        // The normal API click path performs a real Playwright pointer click.
+        // Keep the separate DOM .click() contract above unchanged.
+        await client.click(tabId, { selector: '#blankLink' });
+
+        // Query the managed-tab registry rather than treating a click
+        // response or page visibility as proof of successful registration.
+        let popupTab;
+        const deadline = Date.now() + 5000;
+        while (Date.now() < deadline) {
+          const res = await client.request('GET', `/tabs?userId=${client.userId}`);
+          popupTab = res.tabs.find(t => t.url.includes('/popup-target'));
+          if (popupTab) break;
+          await new Promise(r => setTimeout(r, 200));
+        }
+        expect(popupTab).toBeDefined();
+        expect(popupTab.tabId).toBeDefined();
+        await client.closeTab(popupTab.tabId);
+      } finally {
+        await client.cleanup();
+      }
+    }, 60000);
+
     test('window.open creates a managed tab', async () => {
       const client = createClient(serverUrl);
       try {
