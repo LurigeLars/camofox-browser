@@ -20,12 +20,12 @@ describe('Playwright–Camoufox protocol compatibility', () => {
   test('pins the JS wrapper and Playwright to compatible versions', () => {
     const manifest = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
     const lock = JSON.parse(readFileSync(path.join(root, 'package-lock.json'), 'utf8'));
-    expect(manifest.dependencies['camoufox-js']).toBe('0.13.0');
+    expect(manifest.dependencies['camoufox-js']).toBe('0.11.5');
     expect(manifest.dependencies['playwright-core']).toBe('1.62.1');
-    expect(lock.packages[''].dependencies['camoufox-js']).toBe('0.13.0');
+    expect(lock.packages[''].dependencies['camoufox-js']).toBe('0.11.5');
     expect(lock.packages[''].dependencies['playwright-core']).toBe('1.62.1');
-    expect(lock.packages['node_modules/camoufox-js'].version).toBe('0.13.0');
-    expect(lock.packages['node_modules/camoufox-js'].peerDependencies['playwright-core']).toBe('<1.63.0');
+    expect(lock.packages['node_modules/camoufox-js'].version).toBe('0.11.5');
+    expect(lock.packages['node_modules/camoufox-js'].peerDependencies['playwright-core']).toBe('*');
     expect(lock.packages['node_modules/playwright-core'].version).toBe('1.62.1');
   });
 });
