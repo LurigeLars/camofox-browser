@@ -115,35 +115,40 @@ describe('Tab Lifecycle Contract', () => {
   });
 
   describe('Popup/new-window policy (JO-2456)', () => {
-    test('target=_blank link creates a managed tab', async () => {
+    test('synthetic target=_blank click respects stock Firefox popup blocking', async () => {
       const client = createClient(serverUrl);
       try {
         const { tabId } = await client.createTab(`${testSiteUrl}/popup-source`);
-
-        // Trigger the browser primitive directly. This suite verifies popup
-        // registration, not the separate /click route and its ref rebuilding.
-        await client.request('POST', `/tabs/${tabId}/evaluate`, {
-          userId: client.userId,
-          expression: "document.querySelector('#blankLink').click()",
-        });
-
-        // Wait briefly for popup event to register
+        // Native beta.41 intentionally restores Firefox's popup blocker.
+        // See daijro/camoufox browser/patches/popup-blocker-parity.patch
+        // KNOWN LIMIT: untrusted JS element.click() has no user activation.
+        await client.evaluate(tabId, "document.querySelector('#blankLink').click()");
         await new Promise(r => setTimeout(r, 1500));
-
-        // List tabs — should see more than 1 tab (the popup is now managed)
         const res = await client.request('GET', `/tabs?userId=${client.userId}`);
-        expect(res.tabs.length).toBeGreaterThanOrEqual(2);
+        expect(res.tabs).toHaveLength(1);
+        expect(res.tabs[0].tabId).toBe(tabId);
+        expect(res.tabs.some(tab => tab.url.includes('/popup-target'))).toBe(false);
+      } finally {
+        await client.cleanup();
+      }
+    }, 60000);
 
-        // Find the popup tab
-        const popupTab = res.tabs.find(t => t.url.includes('/popup-target'));
+    test('real Playwright click on target=_blank link creates a managed tab', async () => {
+      const client = createClient(serverUrl);
+      try {
+        const { tabId } = await client.createTab(`${testSiteUrl}/popup-source`);
+        await client.click(tabId, { selector: '#blankLink' });
+        let popupTab;
+        const deadline = Date.now() + 5000;
+        while (Date.now() < deadline) {
+          const res = await client.request('GET', `/tabs?userId=${client.userId}`);
+          popupTab = res.tabs.find(tab => tab.url.includes('/popup-target'));
+          if (popupTab) break;
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
         expect(popupTab).toBeDefined();
         expect(popupTab.tabId).toBeDefined();
-
-        // The popup tab should be closeable via the API
         await client.closeTab(popupTab.tabId);
-        const res2 = await client.request('GET', `/tabs?userId=${client.userId}`);
-        const stillThere = res2.tabs.find(t => t.tabId === popupTab.tabId);
-        expect(stillThere).toBeUndefined();
       } finally {
         await client.cleanup();
       }

@@ -1,0 +1,50 @@
+name: Camoufox Docker image smoke
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - Dockerfile
+      - Dockerfile.ci
+      - package.json
+      - package-lock.json
+      - lib/camoufox-download.js
+      - .github/workflows/camoufox-docker-smoke.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: camoufox-image-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build Linux AMD64 image with pinned SHA256 artifacts
+        run: docker build --platform linux/amd64 -f Dockerfile.ci -t camofox-compat-smoke .
+      - name: Check exact release and launch real browser
+        run: |
+          docker run --rm --platform linux/amd64 --entrypoint node camofox-compat-smoke \
+            --input-type=module -e '
+              import fs from "node:fs";
+              import { firefox } from "playwright-core";
+              import { launchOptions } from "camoufox-js";
+              const v = JSON.parse(fs.readFileSync("/root/.cache/camoufox/version.json", "utf8"));
+              const expectedRelease = fs.readFileSync("/app/lib/camoufox-download.js", "utf8").match(/BUNDLED_CAMOUFOX_RELEASE\s*=\s*[\x27"]([^\x27"]+)[\x27"]/)[1];
+              if (`${v.version}-${v.release}` !== expectedRelease) throw new Error("Unexpected baked browser release");
+              if (!fs.existsSync("/root/.cache/camoufox/camoufox-bin")) throw new Error("Missing browser binary");
+              const browser = await firefox.launch(await launchOptions({ headless: true }));
+              try {
+                const page = await browser.newPage();
+                await page.goto("about:blank");
+                if (!(await page.evaluate(() => document.readyState === "complete"))) throw new Error("Browser failed to navigate");
+                console.log("Camoufox Docker smoke passed:", expectedRelease);
+              } finally {
+                await browser.close();
+              }
+            '
