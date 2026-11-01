@@ -63,3 +63,30 @@ jobs:
           done
       - name: Verify Playwright 1.64.1 page.route storage-state and popup parity
         run: xvfb-run --auto-servernum node scripts/compat/playwright164_protocol_smoke.mjs
+
+  windows-patched-asset:
+    runs-on: windows-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependency tree
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Fetch beta.41 Windows browser without launching it
+        run: npm run fetch-bin
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Patch installed Windows browser and record digest
+        shell: pwsh
+        run: |
+          $root = (& node --input-type=module -e "import { INSTALL_DIR } from 'camoufox-js/dist/pkgman.js'; console.log(INSTALL_DIR)").Trim()
+          if (-not (Test-Path -LiteralPath $root)) { throw "Camoufox cache not found" }
+          python scripts/compat/patch_juggler_976.py $root
+          if ($LASTEXITCODE -ne 0) { throw "Juggler patch failed" }
+          $env:CAMOUFOX_EXECUTABLE = Join-Path $root 'camoufox.exe'
+          if (-not (Test-Path -LiteralPath $env:CAMOUFOX_EXECUTABLE)) { throw "Camoufox executable not found" }
+          node scripts/compat/playwright164_protocol_smoke.mjs
+          if ($LASTEXITCODE -ne 0) { throw "Windows Playwright 1.64 smoke failed" }
