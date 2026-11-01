@@ -7,11 +7,11 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const dockerfile = readFileSync(path.join(root, 'Dockerfile'), 'utf8');
 
 describe('Docker Camoufox release pin', () => {
-  test('uses the reviewed compatible beta.30 assets with per-architecture digests', () => {
-    expect(dockerfile).toContain('ARG CAMOUFOX_VERSION=152.0.4');
-    expect(dockerfile).toContain('ARG CAMOUFOX_RELEASE=beta.30');
-    expect(dockerfile).toContain('ARG CAMOUFOX_SHA256_AMD64=5720d45b894ce1770543de024c6f10d514b38be560fa2dc3226b3d8586caf672');
-    expect(dockerfile).toContain('ARG CAMOUFOX_SHA256_ARM64=60447260af8bebdb0ec3f2aa72f687b879e5598367303de2e3fdbc7a5be8c124');
+  test('uses exact candidate beta.41 assets with per-architecture digests', () => {
+    expect(dockerfile).toContain('ARG CAMOUFOX_VERSION=158.0.1');
+    expect(dockerfile).toContain('ARG CAMOUFOX_RELEASE=beta.41');
+    expect(dockerfile).toContain('ARG CAMOUFOX_SHA256_AMD64=3f2eb1d0451fa58e45e43e55f5e6181565069791ae60c0574f0ceb1f01341c33');
+    expect(dockerfile).toContain('ARG CAMOUFOX_SHA256_ARM64=60e25f6eb95e13d9ec655bc02913d51057e669cb31542e6ace9d2190ab5380af');
     expect(dockerfile).toContain('sha256sum -c -');
   });
 });
