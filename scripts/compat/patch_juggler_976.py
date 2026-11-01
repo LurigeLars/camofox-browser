@@ -93,10 +93,13 @@ def main(root, expected_sha256=None):
                 for entry, data in staged.items():
                     if verify.read(entry) != data:
                         raise ValueError(f"Modified omni.ja content mismatch: {entry}")
-            digest = hashlib.file_digest(open(temporary, "rb"), "sha256").hexdigest()
+            with open(temporary, "rb") as digest_input:
+                digest = hashlib.file_digest(digest_input, "sha256").hexdigest()
             if expected_sha256 and digest != expected_sha256:
                 raise ValueError(f"Patched omni.ja SHA256 mismatch: got {digest}")
             os.chmod(temporary, stat.S_IMODE(archive.stat().st_mode))
+            # Release the Windows lock on the original archive before atomic replace.
+            src.close()
             os.replace(temporary, archive)
         finally:
             if os.path.exists(temporary):
