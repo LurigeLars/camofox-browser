@@ -35,7 +35,7 @@ jobs:
               import { firefox } from "playwright-core";
               import { launchOptions } from "camoufox-js";
               const v = JSON.parse(fs.readFileSync("/root/.cache/camoufox/version.json", "utf8"));
-              const expectedRelease = fs.readFileSync("/app/lib/camoufox-download.js", "utf8").match(/BUNDLED_CAMOUFOX_RELEASE = '\''([^'\'']+)'\''/)[1];
+              const expectedRelease = fs.readFileSync("/app/lib/camoufox-download.js", "utf8").match(/BUNDLED_CAMOUFOX_RELEASE\s*=\s*[\x27"]([^\x27"]+)[\x27"]/)[1];
               if (`${v.version}-${v.release}` !== expectedRelease) throw new Error("Unexpected baked browser release");
               if (!fs.existsSync("/root/.cache/camoufox/camoufox-bin")) throw new Error("Missing browser binary");
               const browser = await firefox.launch(await launchOptions({ headless: true }));
