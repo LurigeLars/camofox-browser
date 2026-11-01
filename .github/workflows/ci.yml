@@ -5,6 +5,7 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
+  workflow_dispatch: # permit targeted CI verification of security-gate PRs on forks
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
