@@ -61,11 +61,13 @@ jobs:
           [[ "$amd" =~ ^sha256:[0-9a-f]{64}$ && "$arm" =~ ^sha256:[0-9a-f]{64}$ ]] || {
             echo "Invalid upstream SHA256 metadata" >&2; exit 1;
           }
-          echo "update=true" >> "$GITHUB_OUTPUT"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "release=$release" >> "$GITHUB_OUTPUT"
-          echo "amd=${amd#sha256:}" >> "$GITHUB_OUTPUT"
-          echo "arm=${arm#sha256:}" >> "$GITHUB_OUTPUT"
+          {
+            echo "update=true"
+            echo "version=$version"
+            echo "release=$release"
+            echo "amd=${amd#sha256:}"
+            echo "arm=${arm#sha256:}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create draft candidate with exact Linux release digests
         if: steps.candidate.outputs.update == 'true'
