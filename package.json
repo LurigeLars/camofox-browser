@@ -186,7 +186,8 @@
     },
     "minimatch": {
       "brace-expansion": "5.0.12"
-    }
+    },
+    "body-parser": "2.4.0"
   },
   "bin": {
     "camofox-browser": "./bin/camofox-browser.js",
