@@ -1,0 +1,92 @@
+name: Reproducible Juggler 976 candidate validation
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - "scripts/compat/patch_juggler_976.py"
+      - "scripts/compat/playwright164_protocol_smoke.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - "Dockerfile"
+      - "Dockerfile.ci"
+      - ".github/workflows/juggler164-candidate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  patched-asset-checksums:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Verify npm lock and exact Playwright 1.64.1
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          node -e "if(require('playwright-core/package.json').version!=='1.64.1')process.exit(1)"
+      - name: Install Firefox runtime dependencies
+        run: npx playwright install-deps firefox
+      - name: Verify and deterministically patch official amd64 and arm64 archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          for arch in x86_64 arm64; do
+            case "$arch" in
+              x86_64) expected=3f2eb1d0451fa58e45e43e55f5e6181565069791ae60c0574f0ceb1f01341c33 ;;
+              arm64) expected=60e25f6eb95e13d9ec655bc02913d51057e669cb31542e6ace9d2190ab5380af ;;
+            esac
+            zip="$RUNNER_TEMP/camoufox-$arch.zip"
+            curl -fL --retry 3 -o "$zip" "https://github.com/daijro/camoufox/releases/download/v158.0.1-beta.41/camoufox-158.0.1-beta.41-lin.$arch.zip"
+            echo "$expected  $zip" | sha256sum -c -
+            first="$RUNNER_TEMP/camoufox-$arch-a"
+            second="$RUNNER_TEMP/camoufox-$arch-b"
+            mkdir -p "$first" "$second"
+            unzip -q "$zip" -d "$first" || true
+            unzip -q "$zip" -d "$second" || true
+            test -x "$first/camoufox-bin"
+            test -x "$second/camoufox-bin"
+            python3 scripts/compat/patch_juggler_976.py "$first" | tee "$RUNNER_TEMP/patch-$arch.log"
+            python3 scripts/compat/patch_juggler_976.py "$second" | tee "$RUNNER_TEMP/patch-$arch-repeat.log"
+            one=$(sha256sum "$first/omni.ja" | awk '{print $1}')
+            two=$(sha256sum "$second/omni.ja" | awk '{print $1}')
+            test "$one" = "$two"
+            echo "VERIFIED_PATCHED_OMNI_SHA256_$arch=$one"
+            if [[ "$arch" = x86_64 ]]; then
+              echo "CAMOUFOX_EXECUTABLE=$first/camoufox-bin" >> "$GITHUB_ENV"
+            fi
+          done
+      - name: Verify Playwright 1.64.1 page.route storage-state and popup parity
+        run: xvfb-run --auto-servernum node scripts/compat/playwright164_protocol_smoke.mjs
+
+  windows-patched-asset:
+    runs-on: windows-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependency tree
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Fetch beta.41 Windows browser without launching it
+        run: npm run fetch-bin
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Patch installed Windows browser and record digest
+        shell: pwsh
+        run: |
+          $root = (& node --input-type=module -e "import { INSTALL_DIR } from 'camoufox-js/dist/pkgman.js'; console.log(INSTALL_DIR)").Trim()
+          if (-not (Test-Path -LiteralPath $root)) { throw "Camoufox cache not found" }
+          python scripts/compat/patch_juggler_976.py $root
+          if ($LASTEXITCODE -ne 0) { throw "Juggler patch failed" }
+          $env:CAMOUFOX_EXECUTABLE = Join-Path $root 'camoufox.exe'
+          if (-not (Test-Path -LiteralPath $env:CAMOUFOX_EXECUTABLE)) { throw "Camoufox executable not found" }
+          node scripts/compat/playwright164_protocol_smoke.mjs
+          if ($LASTEXITCODE -ne 0) { throw "Windows Playwright 1.64 smoke failed" }

@@ -10,6 +10,8 @@ ARG CAMOUFOX_VERSION=158.0.1
 ARG CAMOUFOX_RELEASE=beta.41
 ARG CAMOUFOX_SHA256_AMD64=3f2eb1d0451fa58e45e43e55f5e6181565069791ae60c0574f0ceb1f01341c33
 ARG CAMOUFOX_SHA256_ARM64=60e25f6eb95e13d9ec655bc02913d51057e669cb31542e6ace9d2190ab5380af
+ARG CAMOUFOX_PATCHED_OMNI_SHA256_AMD64=2bad253389292f3009f669401eb8bc3abd615fb7c4e7d9619865f6c75b5c50fa
+ARG CAMOUFOX_PATCHED_OMNI_SHA256_ARM64=5c41978fcb9b568195017f94036fc18ccc4c205c87d42b3b026ea845ed6f9836
 ARG TARGETARCH
 ARG YT_DLP_VERSION=2026.08.19
 ARG YT_DLP_SHA256=1fa6733c37ea6fb51c99ad8fe785e7b7e5f3246c9b980230329d4fb72ed8d4d6
@@ -78,6 +80,16 @@ WORKDIR /app
 COPY package.json package-lock.json postinstall.js ./
 COPY lib/camoufox-download.js ./lib/
 COPY scripts/ ./scripts/
+# Apply the reviewed Juggler protocol fix to the digest-verified upstream beta.41
+# archive; never use the unpatched binary with Playwright >= 1.64.
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+      amd64) PATCHED_OMNI_SHA256="${CAMOUFOX_PATCHED_OMNI_SHA256_AMD64}" ;; \
+      arm64) PATCHED_OMNI_SHA256="${CAMOUFOX_PATCHED_OMNI_SHA256_ARM64}" ;; \
+      *) echo "Unsupported architecture for patched Juggler" >&2; exit 1 ;; \
+    esac; \
+    python3 scripts/compat/patch_juggler_976.py /root/.cache/camoufox --expect-sha256 "${PATCHED_OMNI_SHA256}"
+
 # better-sqlite3 has no prebuild matching this node/arch, so npm ci falls back to
 # `node-gyp rebuild`, which fails on node:*-slim with "Error: not found: make".
 # Install a toolchain for the build and purge it in the same layer so it does not

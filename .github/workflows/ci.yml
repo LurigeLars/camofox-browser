@@ -77,6 +77,13 @@ jobs:
         env:
           # camoufox-js uses this for authenticated GitHub release lookups.
           GITHUB_TOKEN: ${{ github.token }}
+      - name: Verify and patch Camoufox Windows Juggler for Playwright 1.64
+        shell: pwsh
+        run: |
+          $root = (& node --input-type=module -e "import { INSTALL_DIR } from 'camoufox-js/dist/pkgman.js'; console.log(INSTALL_DIR)").Trim()
+          python scripts/compat/patch_juggler_976.py $root --expect-sha256 581d0aa10b1a1f3985ca273f6cdba12a478f359a6ee2975f62ba1ceb04c075fa
+          if ($LASTEXITCODE -ne 0) { throw "Windows patched Camoufox SHA256 mismatch" }
+
 
       - name: Verify Windows process cleanup
         shell: pwsh
@@ -122,6 +129,12 @@ jobs:
         env:
           # camoufox-js uses this for authenticated GitHub release lookups.
           GITHUB_TOKEN: ${{ github.token }}
+      - name: Verify and patch Camoufox Linux Juggler for Playwright 1.64
+        run: |
+          set -euo pipefail
+          root=$(node --input-type=module -e "import { INSTALL_DIR } from 'camoufox-js/dist/pkgman.js'; console.log(INSTALL_DIR)")
+          python3 scripts/compat/patch_juggler_976.py "$root" --expect-sha256 2bad253389292f3009f669401eb8bc3abd615fb7c4e7d9619865f6c75b5c50fa
+
 
       - name: Install browser system deps (cache hit)
         if: steps.playwright-cache.outputs.cache-hit == 'true'
@@ -167,6 +180,13 @@ jobs:
         env:
           # camoufox-js uses this for authenticated GitHub release lookups.
           GITHUB_TOKEN: ${{ github.token }}
+      - name: Verify and patch Camoufox Windows Juggler for Playwright 1.64
+        shell: pwsh
+        run: |
+          $root = (& node --input-type=module -e "import { INSTALL_DIR } from 'camoufox-js/dist/pkgman.js'; console.log(INSTALL_DIR)").Trim()
+          python scripts/compat/patch_juggler_976.py $root --expect-sha256 581d0aa10b1a1f3985ca273f6cdba12a478f359a6ee2975f62ba1ceb04c075fa
+          if ($LASTEXITCODE -ne 0) { throw "Windows patched Camoufox SHA256 mismatch" }
+
 
       - name: Run browser E2E tests
         shell: pwsh

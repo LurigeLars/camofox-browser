@@ -18,16 +18,22 @@ describe('Docker Camoufox release pin', () => {
       expect(dockerfileCi).toContain(dockerfile.match(new RegExp(`ARG ${field}=[^\\n]+`))[0]);
     }
     expect(dockerfileCi).toContain('sha256sum -c -');
+    for (const file of [dockerfile, dockerfileCi]) {
+      expect(file).toContain('CAMOUFOX_PATCHED_OMNI_SHA256_AMD64=2bad253389292f3009f669401eb8bc3abd615fb7c4e7d9619865f6c75b5c50fa');
+      expect(file).toContain('CAMOUFOX_PATCHED_OMNI_SHA256_ARM64=5c41978fcb9b568195017f94036fc18ccc4c205c87d42b3b026ea845ed6f9836');
+      expect(file).toContain('patch_juggler_976.py');
+      expect(file).toContain('--expect-sha256');
+    }
   });
 });
 
 describe('Playwright protocol compatibility', () => {
-  test('verifies tested Playwright 1.63.0 below unsupported 1.64+', () => {
+  test('verifies exact Playwright 1.64.1 with checked Juggler build', () => {
     const manifest = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
     const lock = JSON.parse(readFileSync(path.join(root, 'package-lock.json'), 'utf8'));
     expect(manifest.dependencies['camoufox-js']).toBe('0.11.5');
-    expect(manifest.dependencies['playwright-core']).toBe('1.63.0');
-    expect(lock.packages[''].dependencies['playwright-core']).toBe('1.63.0');
-    expect(lock.packages['node_modules/playwright-core'].version).toBe('1.63.0');
+    expect(manifest.dependencies['playwright-core']).toBe('1.64.1');
+    expect(lock.packages[''].dependencies['playwright-core']).toBe('1.64.1');
+    expect(lock.packages['node_modules/playwright-core'].version).toBe('1.64.1');
   });
 });
