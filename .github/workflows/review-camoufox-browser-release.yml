@@ -1,0 +1,95 @@
+name: Review new Camoufox browser release
+
+on:
+  schedule:
+    - cron: '11 8 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: review-camoufox-browser-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  propose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write # dispatch PR checks explicitly for GITHUB_TOKEN-created candidates
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+      - name: Resolve reviewed upstream release metadata
+        id: candidate
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          release_json=$(gh api repos/daijro/camoufox/releases/latest)
+          tag=$(jq -er '.tag_name' <<< "$release_json")
+          if [[ ! "$tag" =~ ^v([0-9]+\.[0-9]+(\.[0-9]+)?)-(beta\.[0-9]+)$ ]]; then
+            echo "::warning::Upstream release tag is outside reviewed beta format: $tag"
+            exit 0
+          fi
+          version="${BASH_REMATCH[1]}"
+          release="${BASH_REMATCH[3]}"
+          label="${version}-${release}"
+          current="$(sed -n 's/^ARG CAMOUFOX_VERSION=//p' Dockerfile)-$(sed -n 's/^ARG CAMOUFOX_RELEASE=//p' Dockerfile)"
+          echo "Current approved: $current; latest upstream: $label" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$current" == "$label" ]]; then
+            exit 0
+          fi
+
+          # Only one active browser compatibility review: keep failed candidates
+          # visible rather than flooding CI or silently promoting new releases.
+          pending=$(gh pr list --state open --limit 100 --json headRefName --jq '.[] | select(.headRefName | startswith("deps/camoufox-release-") or startswith("deps/review-camoufox-")) | .headRefName')
+          if [[ -n "$pending" ]]; then
+            echo "::notice::Camoufox candidate review already open: $pending"
+            exit 0
+          fi
+          amd_name="camoufox-${label}-lin.x86_64.zip"
+          arm_name="camoufox-${label}-lin.arm64.zip"
+          amd=$(jq -er --arg n "$amd_name" '[.assets[] | select(.name == $n) | .digest] | if length == 1 then .[0] else error("Missing/duplicate amd64 asset") end' <<< "$release_json")
+          arm=$(jq -er --arg n "$arm_name" '[.assets[] | select(.name == $n) | .digest] | if length == 1 then .[0] else error("Missing/duplicate arm64 asset") end' <<< "$release_json")
+          [[ "$amd" =~ ^sha256:[0-9a-f]{64}$ && "$arm" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+            echo "Invalid upstream SHA256 metadata" >&2; exit 1;
+          }
+          echo "update=true" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+          echo "amd=${amd#sha256:}" >> "$GITHUB_OUTPUT"
+          echo "arm=${arm#sha256:}" >> "$GITHUB_OUTPUT"
+
+      - name: Create draft candidate with exact Linux release digests
+        if: steps.candidate.outputs.update == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_VERSION: ${{ steps.candidate.outputs.version }}
+          CANDIDATE_RELEASE: ${{ steps.candidate.outputs.release }}
+          AMD64_SHA: ${{ steps.candidate.outputs.amd }}
+          ARM64_SHA: ${{ steps.candidate.outputs.arm }}
+        run: |
+          set -euo pipefail
+          branch="deps/camoufox-release-${CANDIDATE_VERSION//./-}-${CANDIDATE_RELEASE//./-}"
+          git checkout -b "$branch"
+          node scripts/propose-camoufox-browser-release.mjs \
+            "$CANDIDATE_VERSION" "$CANDIDATE_RELEASE" "$AMD64_SHA" "$ARM64_SHA"
+          git add Dockerfile lib/camoufox-download.js tests/unit/dockerCamoufoxPin.test.js
+          git diff --cached --quiet && { echo 'Release candidate made no changes' >&2; exit 1; }
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "deps: propose Camoufox ${CANDIDATE_VERSION}-${CANDIDATE_RELEASE}"
+          git push origin "HEAD:refs/heads/$branch"
+          gh pr create --draft --base master --head "$branch" \
+            --title "deps: review Camoufox ${CANDIDATE_VERSION}-${CANDIDATE_RELEASE} binary compatibility" \
+            --body "Candidate-only Camoufox browser refresh, from daijro/camoufox official release asset SHA256 metadata. No automatic merge or runtime deployment. Verify camoufox-js@0.11.5 and Playwright protocol compatibility, Linux/Windows browser E2E, session persistence, and Docker image before promotion. GITHUB_TOKEN-created PRs do not trigger normal PR checks: dispatch CI explicitly. Only update the IR browser binary after this candidate passes, in a separate release PR."
+          gh workflow run ci.yml --ref "$branch"
+          gh workflow run static-analysis.yml --ref "$branch"
+          gh workflow run codeql.yml --ref "$branch"
