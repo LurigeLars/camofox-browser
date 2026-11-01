@@ -1,0 +1,67 @@
+name: Security dependency lock verification
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'mcp/package.json'
+      - 'mcp/package-lock.json'
+      - '.github/workflows/security-locks.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'mcp/package.json'
+      - 'mcp/package-lock.json'
+      - '.github/workflows/security-locks.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    name: npm ci / patched transitive dependencies (${{ matrix.directory }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        directory: ['.', 'mcp']
+    defaults:
+      run:
+        working-directory: ${{ matrix.directory }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ${{ matrix.directory }}/package-lock.json
+      - name: Reproducible, no-postinstall dependency install
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify patched dependency floor and lockfile integrity
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const assert = require('node:assert/strict');
+          const manifest = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          const fixes = {
+            '@hono/node-server': '2.1.3',
+            'zod': '4.6.6',
+            'body-parser': '2.4.0',
+            'fast-uri': '3.1.9',
+            'hono': '4.13.13',
+            'ip-address': '10.7.5',
+            'qs': '6.17.1',
+          };
+          for (const [name, version] of Object.entries(fixes)) {
+            const entry = lock.packages[`node_modules/${name}`];
+            assert.equal(entry?.version, version, `${name} lock`);
+            assert.match(entry?.integrity ?? '', /^sha512-/);
+            assert.equal(name === 'ip-address' && !manifest.overrides[name]
+              ? manifest.overrides['express-rate-limit']?.['ip-address']
+              : manifest.overrides[name], version, `${name} override`);
+          }
+          assert.equal(lock.packages['node_modules/body-parser/node_modules/content-type']?.version, '2.1.0');
+          NODE
