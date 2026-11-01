@@ -1,0 +1,76 @@
+name: Beta.41 + Playwright 1.64 Juggler compatibility (test only)
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - "scripts/compat/patch_beta41_juggler_test_only.py"
+      - "scripts/compat/beta41_playwright164_smoke.mjs"
+      - ".github/workflows/beta41-playwright164-compat.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-juggler-compat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install JS wrapper without browser postinstall
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Isolate Playwright 1.64.1 in test runner (do not edit lockfile)
+        run: |
+          npm install --no-save --package-lock=false --ignore-scripts --no-audit --no-fund playwright-core@1.64.1
+          node -e "if(require('playwright-core/package.json').version!=='1.64.1')process.exit(1)"
+
+      - name: Install Firefox-compatible system libraries
+        run: npx playwright install-deps firefox
+
+      - name: Download and verify unchanged upstream beta.41 asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/camoufox-beta41"
+          curl -fL --retry 3 \
+            -o "$RUNNER_TEMP/camoufox-beta41.zip" \
+            "https://github.com/daijro/camoufox/releases/download/v158.0.1-beta.41/camoufox-158.0.1-beta.41-lin.x86_64.zip"
+          echo "3f2eb1d0451fa58e45e43e55f5e6181565069791ae60c0574f0ceb1f01341c33  $RUNNER_TEMP/camoufox-beta41.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/camoufox-beta41.zip" -d "$RUNNER_TEMP/camoufox-beta41"
+          test -x "$RUNNER_TEMP/camoufox-beta41/camoufox-bin"
+          echo "CAMOUFOX_EXECUTABLE=$RUNNER_TEMP/camoufox-beta41/camoufox-bin" >> "$GITHUB_ENV"
+
+      - name: Confirm stock beta.41 rejects Playwright 1.64 interception (baseline)
+        shell: bash
+        run: |
+          set -uo pipefail
+          xvfb-run --auto-servernum node scripts/compat/beta41_playwright164_smoke.mjs > "$RUNNER_TEMP/unpatched.log" 2>&1
+          status=$?
+          cat "$RUNNER_TEMP/unpatched.log"
+          if [[ "$status" -eq 0 ]]; then
+            echo "::error::Unpatched release unexpectedly supports 1.64; investigate before applying patches"
+            exit 1
+          fi
+          if ! grep -Eq 'bypassServiceWorker|Network.setRequestInterception' "$RUNNER_TEMP/unpatched.log"; then
+            echo "::error::Unpatched failure was not the expected Juggler protocol error"
+            exit 1
+          fi
+          echo "Verified original upstream protocol failure"
+
+      - name: Apply exact upstream PR 976 modifications to ephemeral omni.ja
+        run: python scripts/compat/patch_beta41_juggler_test_only.py "$RUNNER_TEMP/camoufox-beta41"
+
+      - name: Confirm Playwright 1.64 interception, storage state and popup parity
+        run: xvfb-run --auto-servernum node scripts/compat/beta41_playwright164_smoke.mjs
+
+      - name: Prohibit production packaging of test patch
+        run: |
+          test ! -e dist/camoufox-bin
+          echo "Test-only patched Firefox artifact stays in runner temp; no publishing or deployment."
