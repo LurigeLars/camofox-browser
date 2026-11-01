@@ -20,6 +20,18 @@ updates:
           - "minor"
           - "patch"
 
+      # Security alerts are not covered by the root-npm version-update group.
+      # Keep breaking major fixes and Camoufox browser-engine bumps separate.
+      root-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "camoufox-js"
+        update-types:
+          - "minor"
+          - "patch"
+
   - package-ecosystem: "npm"
     directory: "/mcp"
     schedule:
@@ -31,6 +43,15 @@ updates:
     groups:
       mcp-npm:
         applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+      # Consolidate related MCP security alerts independently of version PRs.
+      mcp-security:
+        applies-to: security-updates
         patterns:
           - "*"
         update-types:
