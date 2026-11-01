@@ -29,9 +29,9 @@ jobs:
       - name: Set version
         run: |
           if [ -n "${{ github.event.inputs.version }}" ]; then
-            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+            echo "VERSION=${{ github.event.inputs.version }}" >> "$GITHUB_ENV"
           else
-            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_ENV"
           fi
 
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
