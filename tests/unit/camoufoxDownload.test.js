@@ -3,7 +3,7 @@ import { OS_NAME } from 'camoufox-js/dist/pkgman.js';
 import { BUNDLED_CAMOUFOX_RELEASE, CompatibleCamoufoxFetcher } from '../../lib/camoufox-download.js';
 
 describe('bundled Camoufox release selection', () => {
-  test('accepts the pinned binary and rejects newer incompatible releases', () => {
+  test('accepts only the pinned candidate binary and rejects other releases', () => {
     const fetcher = new CompatibleCamoufoxFetcher();
     const asset = (release) => ({
       name: `camoufox-${release}-${OS_NAME}.${fetcher.arch}.zip`,
