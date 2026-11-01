@@ -5,6 +5,7 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
+  workflow_dispatch: # Allow manual validation of security PRs when API-authored commits do not trigger pull_request workflows
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
