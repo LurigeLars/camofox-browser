@@ -44,12 +44,14 @@ jobs:
             exit 1
           fi
 
-          echo "source_id=${source_id}" >> "$GITHUB_OUTPUT"
-          echo "source_tag=${source_tag}" >> "$GITHUB_OUTPUT"
-          echo "source_url=${source_url}" >> "$GITHUB_OUTPUT"
-          echo "mirror_tag=${mirror_tag}" >> "$GITHUB_OUTPUT"
-          echo "asset_count=${asset_count}" >> "$GITHUB_OUTPUT"
-          echo "total_bytes=${total_bytes}" >> "$GITHUB_OUTPUT"
+          {
+            echo "source_id=${source_id}"
+            echo "source_tag=${source_tag}"
+            echo "source_url=${source_url}"
+            echo "mirror_tag=${mirror_tag}"
+            echo "asset_count=${asset_count}"
+            echo "total_bytes=${total_bytes}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Skip an already mirrored release
         id: existing
