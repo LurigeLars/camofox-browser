@@ -13,38 +13,97 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: read # read changed paths; no write permissions
 
 jobs:
+  classify:
+    name: CI change scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      full: ${{ steps.scope.outputs.full }}
+    steps:
+      - name: Classify PR changes (fail closed)
+        id: scope
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          full=true
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            changed_files="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" --jq '.[].filename')"
+            if [[ -n "$changed_files" ]]; then
+              full=false
+              while IFS= read -r path; do
+                case "$path" in
+                  *.md|docs/*|.github/workflows/auto-close-old-reports.yml|.github/workflows/telemetry-deploy.yml)
+                    ;;
+                  *)
+                    full=true
+                    break
+                    ;;
+                esac
+              done <<< "$changed_files"
+            fi
+          fi
+          echo "full=$full" >> "$GITHUB_OUTPUT"
+          if [[ "$full" == "false" ]]; then
+            echo "Browser/runtime tests fast path: only documentation or unrelated reporting/deploy workflow changes." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Full runtime tests required (or non-PR event)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   unit:
+    needs: classify
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
       matrix:
         node-version: [24]
     steps:
+      - name: Validate CI classifier succeeded
+        shell: bash
+        env:
+          CLASSIFIER_RESULT: ${{ needs.classify.result }}
+        run: test "$CLASSIFIER_RESULT" = success
+      - name: Explain skipped runtime tests
+        if: needs.classify.result == 'success' && needs.classify.outputs.full == 'false'
+        shell: bash
+        run: echo "Browser/runtime tests not applicable to this PR; static and security checks still run." >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: needs.classify.outputs.full == 'true'
 
       - name: Setup Node.js ${{ matrix.node-version }}
+        if: needs.classify.outputs.full == 'true'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
 
       - name: Install dependencies
+        if: needs.classify.outputs.full == 'true'
         run: npm ci
 
       - name: Build plugin (TypeScript → JS)
+        if: needs.classify.outputs.full == 'true'
         run: npm run build
 
       - name: Verify standalone MCP package
+        if: needs.classify.outputs.full == 'true'
         run: npm run test:mcp
 
       - name: Audit standalone MCP package
+        if: needs.classify.outputs.full == 'true'
         run: |
           npm ci --prefix mcp --ignore-scripts
           npm audit --prefix mcp --omit=dev
 
       - name: Run unit + plugin tests (Jest)
+        if: needs.classify.outputs.full == 'true'
         run: |
           npm install --no-save jest-junit
           node --experimental-vm-modules node_modules/.bin/jest \
@@ -56,28 +115,44 @@ jobs:
 
 
   windows-process-cleanup:
+    needs: classify
+    if: always()
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
+      - name: Validate CI classifier succeeded
+        shell: bash
+        env:
+          CLASSIFIER_RESULT: ${{ needs.classify.result }}
+        run: test "$CLASSIFIER_RESULT" = success
+      - name: Explain skipped runtime tests
+        if: needs.classify.result == 'success' && needs.classify.outputs.full == 'false'
+        shell: bash
+        run: echo "Browser/runtime tests not applicable to this PR; static and security checks still run." >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: needs.classify.outputs.full == 'true'
 
       - name: Setup Node.js
+        if: needs.classify.outputs.full == 'true'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
 
       - name: Install dependencies
+        if: needs.classify.outputs.full == 'true'
         run: |
           npm ci
           npm install --no-save jest-junit
 
       - name: Install Camoufox
+        if: needs.classify.outputs.full == 'true'
         run: npm run fetch-bin
         env:
           # camoufox-js uses this for authenticated GitHub release lookups.
           GITHUB_TOKEN: ${{ github.token }}
       - name: Verify and patch Camoufox Windows Juggler for Playwright 1.64
+        if: needs.classify.outputs.full == 'true'
         shell: pwsh
         run: |
           $root = (& node --input-type=module -e "import { INSTALL_DIR } from 'camoufox-js/dist/pkgman.js'; console.log(INSTALL_DIR)").Trim()
@@ -86,6 +161,7 @@ jobs:
 
 
       - name: Verify Windows process cleanup
+        if: needs.classify.outputs.full == 'true'
         shell: pwsh
         run: |
           $env:NODE_OPTIONS = '--experimental-vm-modules'
@@ -94,26 +170,41 @@ jobs:
           CI: true
 
   e2e:
+    needs: classify
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       matrix:
         node-version: [24]
     steps:
+      - name: Validate CI classifier succeeded
+        shell: bash
+        env:
+          CLASSIFIER_RESULT: ${{ needs.classify.result }}
+        run: test "$CLASSIFIER_RESULT" = success
+      - name: Explain skipped runtime tests
+        if: needs.classify.result == 'success' && needs.classify.outputs.full == 'false'
+        shell: bash
+        run: echo "Browser/runtime tests not applicable to this PR; static and security checks still run." >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: needs.classify.outputs.full == 'true'
 
       - name: Setup Node.js ${{ matrix.node-version }}
+        if: needs.classify.outputs.full == 'true'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
 
       - name: Install dependencies
+        if: needs.classify.outputs.full == 'true'
         run: |
           npm ci
           npm install --no-save jest-junit
 
       - name: Cache Playwright browsers
+        if: needs.classify.outputs.full == 'true'
         id: playwright-cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
@@ -121,15 +212,17 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install browser
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        if: needs.classify.outputs.full == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps firefox
 
       - name: Install Camoufox
+        if: needs.classify.outputs.full == 'true'
         run: npm run fetch-bin
         env:
           # camoufox-js uses this for authenticated GitHub release lookups.
           GITHUB_TOKEN: ${{ github.token }}
       - name: Verify and patch Camoufox Linux Juggler for Playwright 1.64
+        if: needs.classify.outputs.full == 'true'
         run: |
           set -euo pipefail
           root=$(node --input-type=module -e "import { INSTALL_DIR } from 'camoufox-js/dist/pkgman.js'; console.log(INSTALL_DIR)")
@@ -137,10 +230,11 @@ jobs:
 
 
       - name: Install browser system deps (cache hit)
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        if: needs.classify.outputs.full == 'true' && steps.playwright-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps firefox
 
       - name: Run e2e + browser-dependent unit tests
+        if: needs.classify.outputs.full == 'true'
         run: |
           xvfb-run --auto-servernum \
             node --experimental-vm-modules node_modules/.bin/jest \
@@ -150,6 +244,7 @@ jobs:
           CI: true
 
       - name: Run browser-dependent unit tests
+        if: needs.classify.outputs.full == 'true'
         run: |
           xvfb-run --auto-servernum \
             node --experimental-vm-modules node_modules/.bin/jest \
@@ -159,28 +254,44 @@ jobs:
           CI: true
 
   windows-e2e:
+    needs: classify
+    if: always()
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
+      - name: Validate CI classifier succeeded
+        shell: bash
+        env:
+          CLASSIFIER_RESULT: ${{ needs.classify.result }}
+        run: test "$CLASSIFIER_RESULT" = success
+      - name: Explain skipped runtime tests
+        if: needs.classify.result == 'success' && needs.classify.outputs.full == 'false'
+        shell: bash
+        run: echo "Browser/runtime tests not applicable to this PR; static and security checks still run." >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: needs.classify.outputs.full == 'true'
 
       - name: Setup Node.js
+        if: needs.classify.outputs.full == 'true'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
 
       - name: Install dependencies
+        if: needs.classify.outputs.full == 'true'
         run: |
           npm ci
           npm install --no-save jest-junit
 
       - name: Install Camoufox
+        if: needs.classify.outputs.full == 'true'
         run: npm run fetch-bin
         env:
           # camoufox-js uses this for authenticated GitHub release lookups.
           GITHUB_TOKEN: ${{ github.token }}
       - name: Verify and patch Camoufox Windows Juggler for Playwright 1.64
+        if: needs.classify.outputs.full == 'true'
         shell: pwsh
         run: |
           $root = (& node --input-type=module -e "import { INSTALL_DIR } from 'camoufox-js/dist/pkgman.js'; console.log(INSTALL_DIR)").Trim()
@@ -189,6 +300,7 @@ jobs:
 
 
       - name: Run browser E2E tests
+        if: needs.classify.outputs.full == 'true'
         shell: pwsh
         run: |
           $env:NODE_OPTIONS = '--experimental-vm-modules'
