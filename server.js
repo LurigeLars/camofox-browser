@@ -56,7 +56,8 @@ import { initSentry, captureException as sentryCaptureException, setupExpressErr
 import { prepareExternalCamoufoxExecutable } from './lib/camoufox-executable.js';
 import { createVirtualDisplayRegistry } from './lib/plugin-capabilities.js';
 import { killProcessIds } from './lib/browser-processes.js';
-import { snapshotOwnedBrowserProcesses, survivingOwnedBrowserProcesses, profilePathsFromProcessSnapshot } from './lib/process-ownership.js';
+import { createHealthProbe } from './lib/health-probe.js';
+import { snapshotOwnedBrowserProcesses, survivingOwnedBrowserProcesses, completedBrowserProfilePaths } from './lib/process-ownership.js';
 import { killWindowsProcessTree, refreshWindowsProcesses } from './lib/windows-processes.js';
 import {
   safePageUrl, urlDomain, hashIdentifier,
@@ -797,6 +798,12 @@ const healthState = {
   lastSuccessfulNav: Date.now(),
 };
 
+// One long-lived probe context. `newContext` is a thunk, not a bound value:
+// `browser` is reassigned by restartBrowser(), and the probe must follow it.
+const healthProbe = createHealthProbe({
+  newContext: () => browser.newContext({ viewport: null }),
+});
+
 function getUserNavHealth(userId) {
   const key = normalizeUserId(userId);
   let h = userNavHealth.get(key);
@@ -924,33 +931,6 @@ function getExternalCamoufoxLaunch() {
   return externalCamoufoxLaunch;
 }
 
-async function probeGoogleSearch(candidateBrowser) {
-  let context = null;
-  try {
-    context = await candidateBrowser.newContext({
-      viewport: null,
-      ...contextIdentityOptions({
-        hasProxy: !!proxyPool,
-        directIdentity: CONFIG.directIdentity,
-      }),
-    });
-    const page = await context.newPage();
-    await page.goto('https://www.google.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForTimeout(1200);
-    await page.goto('https://www.google.com/search?q=weather%20today', { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForTimeout(4000);
-
-    const blocked = await isGoogleSearchBlocked(page);
-    return {
-      ok: !blocked && isGoogleSerp(page.url()),
-      url: page.url(),
-      blocked,
-    };
-  } finally {
-    await context?.close().catch(() => {});
-  }
-}
-
 function attachBrowserCleanup(candidateBrowser, localVirtualDisplay) {
   const origClose = candidateBrowser.close.bind(candidateBrowser);
   candidateBrowser.close = async (...args) => {
@@ -1005,11 +985,13 @@ async function _closeBrowserFullyImpl(reason) {
 
   // Close through Playwright (sends CDP Browser.close, then SIGKILL process group)
   let closeTimer;
+  let closed = false;
   try {
     await Promise.race([
       b.close(),
       new Promise((_, reject) => { closeTimer = setTimeout(() => reject(new Error('browser.close() timeout')), 10000); }),
     ]);
+    closed = true;
   } catch (err) {
     log('warn', 'browser.close() failed or timed out', { reason, error: err.message, pid });
   } finally {
@@ -1024,7 +1006,8 @@ async function _closeBrowserFullyImpl(reason) {
 
   // Clean up stale Firefox temp profiles (enable_cache: true accumulates data)
   try {
-    const cleaned = cleanupStaleFirefoxProfiles();
+    const ownedPaths = completedBrowserProfilePaths(ownedBrowserProcesses, closed);
+    const cleaned = cleanupStaleFirefoxProfiles({ ownedPaths });
     if (cleaned.removed > 0) {
       log('info', 'cleaned stale firefox profiles after browser close', cleaned);
     }
@@ -1218,29 +1201,10 @@ async function launchBrowserInstance() {
 
       candidateBrowser = await firefox.launch(options);
 
-      if (proxyPool?.canRotateSessions) {
-        const probe = await probeGoogleSearch(candidateBrowser);
-        if (!probe.ok) {
-          log('warn', 'browser launch google probe failed', {
-            attempt,
-            maxAttempts,
-            proxySession: launchProxy?.sessionId || null,
-            url: probe.url,
-          });
-          if (attempt < maxAttempts) {
-            await candidateBrowser.close().catch(() => {});
-            if (localVirtualDisplay) localVirtualDisplay.kill();
-            continue;
-          }
-          // Last attempt: accept browser in degraded mode rather than death-spiraling.
-          // Non-Google sites will still work; Google requests will get blocked responses.
-          log('error', 'all proxy sessions Google-blocked, accepting browser in degraded mode', {
-            maxAttempts,
-            proxySession: launchProxy?.sessionId || null,
-          });
-        }
-      }
-
+      // Browser startup must remain site-agnostic. Google-specific blocking is
+      // handled by the Google navigation/snapshot rotation paths below; gating
+      // every cold start on a Google probe makes unrelated sites unavailable
+      // whenever the proxy provider's current Google reputation is poor.
       virtualDisplay = localVirtualDisplay;
       browserLaunchProxy = launchProxy;
       _lastBrowserPid = candidateBrowser.process?.()?.pid ?? null;
@@ -1791,24 +1755,19 @@ async function destroyTimedOutTab(session, tabId, reason, userId) {
   }
 }
 
-/**
- * Recycle the oldest (least-used) tab in a session to free a slot.
- * Closes the old tab's page and removes it from its group.
- * Returns { recycledTabId, recycledFromGroup } or null if no tab to recycle.
- */
-async function recycleOldestTab(session, reqId, userId) {
+async function recycleOldestTab(session, reqId, userId, sessionKey) {
   let oldestTab = null;
   let oldestGroup = null;
   let oldestGroupKey = null;
   let oldestTabId = null;
-  for (const [gKey, group] of session.tabGroups) {
-    for (const [tid, ts] of group) {
-      if (!oldestTab || ts.toolCalls < oldestTab.toolCalls) {
-        oldestTab = ts;
-        oldestGroup = group;
-        oldestGroupKey = gKey;
-        oldestTabId = tid;
-      }
+  const group = session.tabGroups.get(sessionKey);
+  if (!group) return null;
+  for (const [tid, ts] of group) {
+    if (!oldestTab || ts.toolCalls < oldestTab.toolCalls) {
+      oldestTab = ts;
+      oldestGroup = group;
+      oldestGroupKey = sessionKey;
+      oldestTabId = tid;
     }
   }
   if (!oldestTab) return null;
@@ -2679,7 +2638,7 @@ function refToLocator(page, ref, refs) {
       frame = page.frames().find(f => f.url() === frameUrl || f.url().startsWith(frameUrl.slice(0, 80)));
     }
     if (frame) {
-      let locator = frame.getByRole(role, name ? { name } : undefined);
+      let locator = frame.getByRole(role, { name, exact: true });
       locator = locator.nth(nth);
       return locator;
     }
@@ -2687,7 +2646,7 @@ function refToLocator(page, ref, refs) {
     log('warn', 'refToLocator: frame not found for iframe ref', { ref, frameName, frameUrl: frameUrl?.slice(0, 60) });
   }
   
-  let locator = page.getByRole(role, name ? { name } : undefined);
+  let locator = page.getByRole(role, { name, exact: true });
   
   // Always use .nth() to disambiguate duplicate role+name combinations
   // This avoids "strict mode violation" when multiple elements match
@@ -3054,7 +3013,7 @@ app.post('/tabs', async (req, res) => {
       
       // Recycle oldest tab when limits are reached instead of rejecting
       if (totalTabs >= MAX_TABS_PER_SESSION || getTotalTabCount() >= MAX_TABS_GLOBAL) {
-        const recycled = await recycleOldestTab(session, req.reqId, userId);
+        const recycled = await recycleOldestTab(session, req.reqId, userId, resolvedSessionKey);
         if (!recycled) {
           throw Object.assign(new Error('Maximum tabs per session reached'), { statusCode: 429 });
         }
@@ -5699,7 +5658,13 @@ app.get('/tabs/:tabId/stats', async (req, res) => {
  *                 type: string
  *               expression:
  *                 type: string
- *                 description: JavaScript expression to evaluate.
+ *                 description: >
+ *                   JavaScript expression to evaluate. This is an expression, not a
+ *                   function body: a top-level `return` is a syntax error. Wrap
+ *                   statements in an IIFE — `(() => { ... return x; })()` — and note
+ *                   that a bare arrow function (`() => x`, uncalled) evaluates to a
+ *                   function object and serializes to no result.
+ *                 example: document.title
  *     responses:
  *       200:
  *         description: Evaluation result.
@@ -5712,7 +5677,10 @@ app.get('/tabs/:tabId/stats', async (req, res) => {
  *                   type: boolean
  *                 result: {}
  *       400:
- *         description: Bad request.
+ *         description: >
+ *           Bad request. `code: invalid_expression` means the expression did not
+ *           compile (for example a top-level `return`); it is not retryable until the
+ *           caller fixes the JavaScript.
  *         content:
  *           application/json:
  *             schema:
@@ -6657,7 +6625,7 @@ app.post('/tabs/open', async (req, res) => {
     let totalTabs = 0;
     for (const g of session.tabGroups.values()) totalTabs += g.size;
     if (totalTabs >= MAX_TABS_PER_SESSION || getTotalTabCount() >= MAX_TABS_GLOBAL) {
-      const recycled = await recycleOldestTab(session, req.reqId, userId);
+      const recycled = await recycleOldestTab(session, req.reqId, userId, listItemId);
       if (!recycled) {
         return res.status(429).json({ error: 'Maximum tabs per session reached' });
       }
@@ -7330,18 +7298,13 @@ setInterval(async () => {
     log('warn', 'health probe forced despite active ops', { activeOps: healthState.activeOps, timeSinceSuccessMs: timeSinceSuccess });
   }
   
-  let testContext;
   try {
-    testContext = await browser.newContext({ viewport: null });
-    const page = await testContext.newPage();
-    await page.goto('about:blank', { timeout: 5000 });
-    await page.close();
-    await testContext.close();
+    await healthProbe.probe();
     healthState.lastSuccessfulNav = Date.now();
   } catch (err) {
     failuresTotal.labels('health_probe', 'internal').inc();
     log('warn', 'health probe failed', { error: err.message, timeSinceSuccessMs: timeSinceSuccess });
-    if (testContext) await testContext.close().catch(() => {});
+    await healthProbe.dispose();
     restartBrowser('health probe failed').catch(() => {});
   }
 }, 60_000);
@@ -7458,26 +7421,6 @@ const server = app.listen(PORT, CONFIG.bindHost || undefined, async () => {
   if (tmpCleanup.removed > 0) {
     log('info', 'cleaned up orphaned camoufox temp files', tmpCleanup);
   }
-  const profileCleanup = cleanupStaleFirefoxProfiles();
-  if (profileCleanup.removed > 0) {
-    log('info', 'cleaned up stale firefox profiles on startup', profileCleanup);
-  }
-
-  // Periodic cleanup is liveness-aware: a running browser's profile can look
-  // stale by mtime while its storage is still in use.
-  setInterval(() => {
-    try {
-      const profiles = browser ? profilePathsFromProcessSnapshot(snapshotOwnedBrowserProcesses(process.pid)) : [];
-      if (browser && profiles.size === 0) {
-        log('warn', 'skipped periodic firefox profile cleanup: live profile path unavailable');
-        return;
-      }
-      const cleaned = cleanupStaleFirefoxProfiles({ protectedPaths: profiles });
-      if (cleaned.removed > 0) {
-        log('info', 'periodic firefox profile cleanup', cleaned);
-      }
-    } catch { /* best effort */ }
-  }, 10 * 60 * 1000).unref();
   const traceSweep = sweepOldTraces({
     baseDir: CONFIG.tracesDir,
     ttlMs: CONFIG.tracesTtlHours * 3600 * 1000,
