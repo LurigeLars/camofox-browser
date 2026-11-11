@@ -213,7 +213,7 @@ jobs:
 
       - name: Install browser
         if: needs.classify.outputs.full == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps firefox
+        run: npx --no-install playwright-core install --with-deps firefox
 
       - name: Install Camoufox
         if: needs.classify.outputs.full == 'true'
@@ -231,7 +231,7 @@ jobs:
 
       - name: Install browser system deps (cache hit)
         if: needs.classify.outputs.full == 'true' && steps.playwright-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps firefox
+        run: npx --no-install playwright-core install-deps firefox
 
       - name: Run e2e + browser-dependent unit tests
         if: needs.classify.outputs.full == 'true'
