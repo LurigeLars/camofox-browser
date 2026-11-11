@@ -53,7 +53,7 @@ jobs:
 
       - name: Install browser
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps firefox
+        run: npx --no-install playwright-core install --with-deps firefox
 
       - name: Install Camoufox
         run: npm run fetch-bin
@@ -62,7 +62,7 @@ jobs:
 
       - name: Install browser system deps (cache hit)
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps firefox
+        run: npx --no-install playwright-core install-deps firefox
 
       - name: E2E tests
         run: |
