@@ -9,6 +9,11 @@ updates:
       time: "07:00"
       timezone: "Europe/Stockholm"
     open-pull-requests-limit: 2
+    # The patched Camoufox browser speaks the Playwright 1.64 protocol; 1.65 breaks
+    # Browser.setDownloadOptions. Keep 1.64.x patches until Camoufox supports newer.
+    ignore:
+      - dependency-name: "playwright-core"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
     groups:
       root-npm:
         applies-to: version-updates
