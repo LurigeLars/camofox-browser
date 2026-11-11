@@ -31,7 +31,7 @@ jobs:
           npm ci --ignore-scripts --no-audit --no-fund
           node -e "if(require('playwright-core/package.json').version!=='1.64.1')process.exit(1)"
       - name: Install Firefox runtime dependencies
-        run: npx playwright install-deps firefox
+        run: npx --no-install playwright-core install-deps firefox
       - name: Verify and deterministically patch official amd64 and arm64 archives
         shell: bash
         run: |
