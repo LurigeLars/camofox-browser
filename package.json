@@ -168,7 +168,7 @@
     },
     "qs": "6.17.1",
     "fast-uri": "3.1.9",
-    "hono": "4.13.13",
+    "hono": "4.13.16",
     "proxy-addr": "2.0.8",
     "express-rate-limit": {
       "ip-address": "10.7.5"
