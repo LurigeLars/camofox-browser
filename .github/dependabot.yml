@@ -22,8 +22,14 @@ updates:
     ignore:
       - dependency-name: "playwright-core"
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # The browser engine is promoted through the reviewed Camoufox pin process,
+      # not the weekly batch; 0.x minors are breaking here.
+      - dependency-name: "camoufox-js"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # TypeScript majors need a dedicated migration (tracked in issue #132).
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
     groups:
-
       # Security alerts are not covered by the root-npm version-update group.
       # Keep breaking major fixes and Camoufox browser-engine bumps separate.
       root-security:
