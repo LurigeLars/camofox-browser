@@ -26,7 +26,7 @@ updates:
       # not the weekly batch; 0.x minors are breaking here.
       - dependency-name: "camoufox-js"
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
-      # TypeScript majors need a dedicated migration (tracked in an issue).
+      # TypeScript majors need a dedicated migration (tracked in issue #132).
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
     groups:
