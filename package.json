@@ -145,7 +145,7 @@
     "fetch-bin": "node lib/camoufox-download.js"
   },
   "dependencies": {
-    "better-sqlite3": "13.1.1",
+    "better-sqlite3": "13.2.0",
     "camoufox-js": "0.11.5",
     "express": "^5.2.1",
     "express-rate-limit": "8.7.4",
