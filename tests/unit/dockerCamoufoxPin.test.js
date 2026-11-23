@@ -8,10 +8,10 @@ const dockerfile = readFileSync(path.join(root, 'Dockerfile'), 'utf8');
 
 describe('Docker Camoufox release pin', () => {
   test('uses verified candidate beta.41 assets with per-architecture digests', () => {
-    expect(dockerfile).toContain('ARG CAMOUFOX_VERSION=158.0.1');
-    expect(dockerfile).toContain('ARG CAMOUFOX_RELEASE=beta.41');
-    expect(dockerfile).toContain('ARG CAMOUFOX_SHA256_AMD64=3f2eb1d0451fa58e45e43e55f5e6181565069791ae60c0574f0ceb1f01341c33');
-    expect(dockerfile).toContain('ARG CAMOUFOX_SHA256_ARM64=60e25f6eb95e13d9ec655bc02913d51057e669cb31542e6ace9d2190ab5380af');
+    expect(dockerfile).toContain('ARG CAMOUFOX_VERSION=159.0');
+    expect(dockerfile).toContain('ARG CAMOUFOX_RELEASE=beta.43');
+    expect(dockerfile).toContain('ARG CAMOUFOX_SHA256_AMD64=9315ff337b730b697a17298b37575945036a2607b888759e900bc31f7f910cb2');
+    expect(dockerfile).toContain('ARG CAMOUFOX_SHA256_ARM64=4b57cba5ae88388c2440200daf2257be240cf1eac2c2b3adff1e2ecda1900c16');
     expect(dockerfile).toContain('sha256sum -c -');
     const dockerfileCi = readFileSync(path.join(root, 'Dockerfile.ci'), 'utf8');
     for (const field of ['CAMOUFOX_VERSION', 'CAMOUFOX_RELEASE', 'CAMOUFOX_SHA256_AMD64', 'CAMOUFOX_SHA256_ARM64']) {
