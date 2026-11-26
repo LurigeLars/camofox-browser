@@ -3,21 +3,39 @@ name: Reproducible Juggler 976 candidate validation
 on:
   pull_request:
     branches: [master]
-    paths:
-      - "scripts/compat/patch_juggler_976.py"
-      - "scripts/compat/playwright164_protocol_smoke.mjs"
-      - "package.json"
-      - "package-lock.json"
-      - "Dockerfile"
-      - "Dockerfile.ci"
-      - ".github/workflows/juggler164-candidate.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  changes:
+    # pull_request has no paths filter so that the required gate always reports; this job
+    # applies the same filter and the jobs below are skipped when nothing relevant changed.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.filter.outputs.run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" != pull_request ]; then echo run=true >> "$GITHUB_OUTPUT"; exit 0; fi
+          # The PR merge commit: HEAD^1 is the base, so this diff is exactly the PR's changes.
+          if git diff --quiet HEAD^1 HEAD -- ':(glob)scripts/compat/patch_juggler_976.py' ':(glob)scripts/compat/playwright164_protocol_smoke.mjs' ':(glob)package.json' ':(glob)package-lock.json' ':(glob)Dockerfile' ':(glob)Dockerfile.ci' ':(glob).github/workflows/juggler164-candidate.yml'; then
+            echo run=false >> "$GITHUB_OUTPUT"
+          else
+            echo run=true >> "$GITHUB_OUTPUT"
+          fi
+
   patched-asset-checksums:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -65,6 +83,8 @@ jobs:
         run: xvfb-run --auto-servernum node scripts/compat/playwright164_protocol_smoke.mjs
 
   windows-patched-asset:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: windows-latest
     timeout-minutes: 22
     steps:
@@ -90,3 +110,21 @@ jobs:
           if (-not (Test-Path -LiteralPath $env:CAMOUFOX_EXECUTABLE)) { throw "Camoufox executable not found" }
           node scripts/compat/playwright164_protocol_smoke.mjs
           if ($LASTEXITCODE -ne 0) { throw "Windows Playwright 1.64 smoke failed" }
+
+  gate:
+    name: gate (juggler164-candidate)
+    if: always()
+    needs: [changes, patched-asset-checksums, windows-patched-asset]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every job to succeed or be skipped by the path filter
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          for result in $RESULTS; do
+            case "$result" in
+              success|skipped) ;;
+              *) echo "::error::A job in this workflow ended with: $result"; exit 1 ;;
+            esac
+          done
